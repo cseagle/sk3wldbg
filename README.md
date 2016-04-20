@@ -29,9 +29,11 @@ Linux, OS X).
 The plugin is currently based on a patched branch of the Unicorn Engine, available
 here: https://github.com/cseagle/Unicorn/tree/no-thread
 
+```
 git clone https://github.com/cseagle/Unicorn.git
 cd Unicorn
 git checkout no-thread
+```
 
 On all platforms you should clone sk3wldbg into your IDA SDK plugins directory so 
 that you end up with $IDASDKDIR/plugins/sk3wldbg because the build files all use
