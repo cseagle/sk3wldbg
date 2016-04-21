@@ -20,7 +20,7 @@
 #include <ida.hpp>
 #include "loader.h"
 
-struct ELF32_hdr {
+struct ELF32_Ehdr {
    uint8_t  e_ident[16];
 #define ELF_IDENT  "\177ELF\x01\x01\x01"
    uint16_t e_type;         /* Must be 2 for executable */
@@ -51,6 +51,34 @@ struct ELF32_Phdr {
 #define PF_W        (1<<1)          /* Mapped writable */
 #define PF_R        (1<<2)          /* Mapped readable */
    uint32_t        p_align;        /* Only used by core dumps */
+};
+
+struct Elf64_Ehdr {
+  uint8_t    e_ident[16];     /* Magic number and other info */
+  uint16_t   e_type;                 /* Object file type */
+  uint16_t   e_machine;              /* Architecture */
+  uint32_t   e_version;              /* Object file version */
+  uint64_t   e_entry;                /* Entry point virtual address */
+  uint64_t   e_phoff;                /* Program header table file offset */
+  uint64_t   e_shoff;                /* Section header table file offset */
+  uint32_t   e_flags;                /* Processor-specific flags */
+  uint16_t   e_ehsize;               /* ELF header size in bytes */
+  uint16_t   e_phentsize;            /* Program header table entry size */
+  uint16_t   e_phnum;                /* Program header table entry count */
+  uint16_t   e_shentsize;            /* Section header table entry size */
+  uint16_t   e_shnum;                /* Section header table entry count */
+  uint16_t   e_shstrndx;             /* Section header string table index */
+};
+
+struct Elf64_Phdr {
+  uint32_t   p_type;                 /* Segment type */
+  uint32_t   p_flags;                /* Segment flags */
+  uint64_t   p_offset;               /* Segment file offset */
+  uint64_t   p_vaddr;                /* Segment virtual address */
+  uint64_t   p_paddr;                /* Segment physical address */
+  uint64_t   p_filesz;               /* Segment size in file */
+  uint64_t   p_memsz;                /* Segment size in memory */
+  uint64_t   p_align;                /* Segment alignment */
 };
 
 static unsigned int ida_to_uc_perms_map[] = {
@@ -140,13 +168,51 @@ bool loadPE32(sk3wldbg *uc, void *img, size_t /*sz*/) {
    return true;
 }
 
-bool loadElf64(sk3wldbg * /*uc*/, void * /*img*/, size_t /*sz*/) {
+bool loadElf64(sk3wldbg *uc, void *img, uint64_t sz) {
+   Elf64_Ehdr *elf = (Elf64_Ehdr*)img;
+   if (memcmp(elf->e_ident, "\x7f" "ELF", 4) != 0) {
+      msg("bad ELF magic: 0x%x\n", *(uint32_t*)elf->e_ident);
+      return false;
+   }
+   if (elf->e_phoff > (sz - sizeof(Elf64_Phdr))) {
+      msg("bad e_phoff\n");
+      return false;
+   }
+   Elf64_Phdr *phdr = (Elf64_Phdr*)(elf->e_phoff + (char*)img);
+   for (uint16_t i = 0; i < elf->e_phnum; i++) {
+      msg("phdr->p_type: %d\n", phdr->p_type);
+      if (phdr->p_type == PT_LOAD) {
+         uint64_t begin = phdr->p_vaddr & ~0xfff;
+         uint64_t end = (phdr->p_vaddr + phdr->p_memsz + 0xfff) & ~0xfff;
+         msg("ELF64 loader mapping 0x%llx bytes at 0x%llx, from file offset 0x%llx\n", (uint64_t)phdr->p_memsz,
+             (uint64_t)phdr->p_vaddr, (uint64_t)phdr->p_offset);
+         uc->map_mem_zero(begin, end, ida_to_uc_perms_map[phdr->p_flags & 7]);
+         uint64_t offset = phdr->p_offset & ~0xfff;
+         uint64_t endoff = (phdr->p_offset + phdr->p_filesz + 0xfff) & ~0xfff;
+         if (endoff > sz) {
+            endoff = phdr->p_offset + phdr->p_filesz;
+         }
+         msg("Copying bytes 0x%llx:0x%llx into block\n", (uint64_t)offset, (uint64_t)endoff);
+         uc_err err = uc_mem_write(uc->uc, begin, offset + (char*)img, (size_t)(endoff - offset));
+         if (err != UC_ERR_OK) {
+            msg("uc_mem_write failed with error: %d\n", err);
+         }
+      }
+      phdr++;
+   }   
+
+   //ELF stack
+   uint64_t stack_top = 0x7ffffffff000ll;
+   uc->map_mem_zero(stack_top - 0x100000, stack_top, UC_PROT_READ | UC_PROT_WRITE);
+
+   stack_top -= 16;
+   uc->set_sp(stack_top);
 
    return true;
 }
 
 bool loadElf32(sk3wldbg *uc, void *img, size_t sz) {
-   ELF32_hdr *elf = (ELF32_hdr*)img;
+   ELF32_Ehdr *elf = (ELF32_Ehdr*)img;
    if (memcmp(elf->e_ident, "\x7f" "ELF", 4) != 0) {
       msg("bad ELF magic: 0x%x\n", *(uint32_t*)elf->e_ident);
       return false;
@@ -203,7 +269,7 @@ bool loadImage(sk3wldbg *uc, void *img, size_t sz) {
       case f_ELF:
          if (inf.lflags & LFLG_64BIT) {
             msg("loadElf64\n");
-            result = loadElf64(uc, img, sz);
+            result = loadElf64(uc, img, (uint64_t)sz);
          }
          else {
             msg("loadElf32\n");
