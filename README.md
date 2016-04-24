@@ -27,12 +27,12 @@ have a 32-bit build of the Unicorn library for your IDA platform (Windows,
 Linux, OS X).
 
 The plugin is currently based on a patched branch of the Unicorn Engine, available
-here: https://github.com/cseagle/Unicorn/tree/no-thread
+here: https://github.com/cseagle/Unicorn/tree/ram_addr
 
 ```
 git clone https://github.com/cseagle/Unicorn.git
-cd Unicorn
-git checkout no-thread
+cd unicorn
+git checkout ram-addr
 ```
 
 On all platforms you should clone sk3wldbg into your IDA SDK plugins directory so 
