@@ -21,5 +21,6 @@
 
 struct sk3wldbg_m68k : public sk3wldbg {
    sk3wldbg_m68k();
+   bool save_ret_addr(uint64_t retaddr);
 };
 

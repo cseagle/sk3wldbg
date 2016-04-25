@@ -74,3 +74,9 @@ sk3wldbg_m68k::sk3wldbg_m68k() : sk3wldbg("68000", UC_ARCH_M68K, UC_MODE_32) {
    bpt_size = 0;                    ///< Size of this array
 }
 
+bool sk3wldbg_m68k::save_ret_addr(uint64_t retaddr) {
+   uint64_t new_sp = get_sp() - sizeof(uint32_t);
+   uc_mem_write(uc, new_sp, &retaddr, sizeof(uint32_t));
+   set_sp(new_sp);
+   return true;
+}

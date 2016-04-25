@@ -135,6 +135,8 @@ static struct register_info_t ppc_regs[] = {
    {"FPSCR", 0, PPC_FPU, dt_dword, ppc_fpu_flags, 0xFFEFFFFF},
 };
 
+#define PPC_LR 64
+
 static struct register_info_t ppc_regs64[] = {
    {"GPR0", REGISTER_ADDRESS, PPC_GENERAL, dt_qword, NULL, 0},
    {"GPR1", REGISTER_ADDRESS, PPC_GENERAL, dt_qword, NULL, 0},
@@ -208,6 +210,8 @@ static struct register_info_t ppc_regs64[] = {
    {"FPSCR", 0, PPC_FPU, dt_dword, ppc_fpu_flags, 0xFFEFFFFF},
 };
 
+#define PPC64_LR 64
+
 sk3wldbg_ppc::sk3wldbg_ppc() : sk3wldbg("PPCL", UC_ARCH_PPC, UC_MODE_32) {
    //reset any overridden function pointers and setup register name fields
 
@@ -225,6 +229,11 @@ sk3wldbg_ppc::sk3wldbg_ppc() : sk3wldbg("PPCL", UC_ARCH_PPC, UC_MODE_32) {
 
 }
 
+bool sk3wldbg_ppc::save_ret_addr(uint64_t retaddr) {
+   uc_reg_write(uc, reg_map[PPC_LR], &retaddr);
+   return true;
+}
+
 sk3wldbg_ppc64::sk3wldbg_ppc64() : sk3wldbg("PPCL", UC_ARCH_PPC, UC_MODE_64) {
    //reset any overridden function pointers and setup register name fields
 
@@ -240,5 +249,10 @@ sk3wldbg_ppc64::sk3wldbg_ppc64() : sk3wldbg("PPCL", UC_ARCH_PPC, UC_MODE_64) {
    bpt_bytes = NULL;                ///< Array of bytes for a breakpoint instruction
    bpt_size = 0;                    ///< Size of this array
 
+}
+
+bool sk3wldbg_ppc64::save_ret_addr(uint64_t retaddr) {
+   uc_reg_write(uc, reg_map[PPC64_LR], &retaddr);
+   return true;
 }
 

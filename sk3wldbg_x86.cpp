@@ -117,6 +117,13 @@ sk3wldbg_x86_32::sk3wldbg_x86_32() : sk3wldbg("metapc", UC_ARCH_X86, UC_MODE_32)
 
 }
 
+bool sk3wldbg_x86_32::save_ret_addr(uint64_t retaddr) {
+   uint64_t new_sp = get_sp() - sizeof(uint32_t);
+   uc_mem_write(uc, new_sp, &retaddr, sizeof(uint32_t));
+   set_sp(new_sp);
+   return true;
+}
+
 void x86_32_bkpt(uc_engine *uc, sk3wldbg_x86_32 *dbg) {
    uc_emu_stop(uc);
    dbg->emu_state = RS_PAUSE;
@@ -171,3 +178,9 @@ sk3wldbg_x86_64::sk3wldbg_x86_64() : sk3wldbg("metapc", UC_ARCH_X86, UC_MODE_64)
 
 }
 
+bool sk3wldbg_x86_64::save_ret_addr(uint64_t retaddr) {
+   uint64_t new_sp = get_sp() - sizeof(uint64_t);
+   uc_mem_write(uc, new_sp, &retaddr, sizeof(uint64_t));
+   set_sp(new_sp);
+   return true;
+}

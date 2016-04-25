@@ -99,6 +99,8 @@ static struct register_info_t mips_regs[] = {
    {"PC", REGISTER_ADDRESS | REGISTER_IP, MIPS_GENERAL, dt_dword, NULL, 0}
 };
 
+#define MIPS_RA 31
+
 static int32_t mips_reg_map[] = {
    UC_MIPS_REG_0, UC_MIPS_REG_1, UC_MIPS_REG_2, UC_MIPS_REG_3, UC_MIPS_REG_4,
    UC_MIPS_REG_5, UC_MIPS_REG_6, UC_MIPS_REG_7, UC_MIPS_REG_8,
@@ -188,6 +190,8 @@ static struct register_info_t mips_regs64[] = {
    {"PC", REGISTER_ADDRESS | REGISTER_IP, MIPS_GENERAL, dt_qword, NULL, 0}
 };
 
+#define MIPS64_RA 31
+
 static int32_t mips64_reg_map[] = {
    UC_MIPS_REG_0, UC_MIPS_REG_1, UC_MIPS_REG_2, UC_MIPS_REG_3, UC_MIPS_REG_4,
    UC_MIPS_REG_5, UC_MIPS_REG_6, UC_MIPS_REG_7, UC_MIPS_REG_8,
@@ -225,6 +229,11 @@ sk3wldbg_mips::sk3wldbg_mips() : sk3wldbg("mipsl", UC_ARCH_MIPS, UC_MODE_32) {
 
 }
 
+bool sk3wldbg_mips::save_ret_addr(uint64_t retaddr) {
+   uc_reg_write(uc, reg_map[MIPS_RA], &retaddr);
+   return true;
+}
+
 sk3wldbg_mips64::sk3wldbg_mips64() : sk3wldbg("mipsl", UC_ARCH_MIPS, UC_MODE_64) {
    //reset any overridden function pointers and setup register name fields
 
@@ -242,3 +251,7 @@ sk3wldbg_mips64::sk3wldbg_mips64() : sk3wldbg("mipsl", UC_ARCH_MIPS, UC_MODE_64)
 
 }
 
+bool sk3wldbg_mips64::save_ret_addr(uint64_t retaddr) {
+   uc_reg_write(uc, reg_map[MIPS64_RA], &retaddr);
+   return true;
+}

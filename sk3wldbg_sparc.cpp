@@ -71,6 +71,8 @@ static struct register_info_t sparc_regs[] = {
    {"PSR", 0, SPARC_GENERAL, dt_dword, sparc_flags, 0xFFF03FFF},
 };
 
+#define SPARC_LR 15
+
 static int32_t sparc_reg_map[] = {
    UC_SPARC_REG_G0, UC_SPARC_REG_G1, UC_SPARC_REG_G2, UC_SPARC_REG_G3,
    UC_SPARC_REG_G4, UC_SPARC_REG_G5, UC_SPARC_REG_G6, UC_SPARC_REG_G7,
@@ -102,6 +104,11 @@ sk3wldbg_sparc::sk3wldbg_sparc() : sk3wldbg("sparcl", UC_ARCH_SPARC, UC_MODE_32)
 
 }
 
+bool sk3wldbg_sparc::save_ret_addr(uint64_t retaddr) {
+   uc_reg_write(uc, reg_map[SPARC_LR], &retaddr);
+   return true;
+}
+
 sk3wldbg_sparc64::sk3wldbg_sparc64() : sk3wldbg("sparcl", UC_ARCH_SPARC, UC_MODE_64) {
    //reset any overridden function pointers and setup register name fields
 
@@ -118,3 +125,9 @@ sk3wldbg_sparc64::sk3wldbg_sparc64() : sk3wldbg("sparcl", UC_ARCH_SPARC, UC_MODE
    bpt_size = 0;                    ///< Size of this array
 
 }
+
+bool sk3wldbg_sparc64::save_ret_addr(uint64_t retaddr) {
+   uc_reg_write(uc, reg_map[SPARC_LR], &retaddr);
+   return true;
+}
+

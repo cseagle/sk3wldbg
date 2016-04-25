@@ -58,6 +58,8 @@ static struct register_info_t arm_regs[] = {
    {"PSR", 0, ARM_GENERAL, dt_dword, arm_flags, 0xF80000FF},
 };
 
+#define ARM_LR 14
+
 static int32_t arm_reg_map[] = {
    UC_ARM_REG_R0, UC_ARM_REG_R1, UC_ARM_REG_R2, UC_ARM_REG_R3, UC_ARM_REG_R4,
    UC_ARM_REG_R5, UC_ARM_REG_R6, UC_ARM_REG_R7, UC_ARM_REG_R8,
@@ -102,6 +104,8 @@ static struct register_info_t aarch64_regs[] = {
    {"PSR", 0, ARM_GENERAL, dt_dword, arm_flags, 0xF80000FF},
 };
 
+#define ARM64_LR 30
+
 static int32_t arm64_reg_map[] = {
    UC_ARM64_REG_X0, UC_ARM64_REG_X1, UC_ARM64_REG_X2, UC_ARM64_REG_X3, UC_ARM64_REG_X4,
    UC_ARM64_REG_X5, UC_ARM64_REG_X6, UC_ARM64_REG_X7, UC_ARM64_REG_X8,
@@ -139,6 +143,11 @@ void sk3wldbg_arm::check_mode(ea_t addr) {
    }
 }
 
+bool sk3wldbg_arm::save_ret_addr(uint64_t retaddr) {
+   uc_reg_write(uc, reg_map[ARM_LR], &retaddr);
+   return true;
+}
+
 sk3wldbg_aarch64::sk3wldbg_aarch64() : sk3wldbg("ARM", UC_ARCH_ARM64, UC_MODE_ARM) {
    //reset any overridden function pointers and setup register name fields
 
@@ -162,3 +171,9 @@ void sk3wldbg_aarch64::check_mode(ea_t addr) {
       debug_mode = (uc_mode)((int)UC_MODE_THUMB | (int)debug_mode);
    }
 }
+
+bool sk3wldbg_aarch64::save_ret_addr(uint64_t retaddr) {
+   uc_reg_write(uc, reg_map[ARM64_LR], &retaddr);
+   return true;
+}
+

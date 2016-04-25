@@ -90,6 +90,7 @@ struct sk3wldbg : public debugger_t {
    qsemaphore_t run_sem;
    run_state emu_state;
    qthread_t process_thread;
+   regval_t *saved;
    
    int32_t *reg_map;  //map of internal unicorn reg enums to dbg->_register index values
 
@@ -118,6 +119,13 @@ struct sk3wldbg : public debugger_t {
 
    void add_bpt(uint64_t bpt_addr);
    void del_bpt(uint64_t bpt_addr);
+   
+   bool save_registers();
+   bool restore_registers();
+   
+   //some processors push, some processors save it in a register
+   //do the right thing here
+   virtual bool save_ret_addr(uint64_t retaddr) = 0;
    
    bool done() {return finished;}
    uint64_t get_pc();

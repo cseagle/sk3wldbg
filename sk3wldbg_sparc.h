@@ -21,9 +21,11 @@
 
 struct sk3wldbg_sparc : public sk3wldbg {
    sk3wldbg_sparc();
+   bool save_ret_addr(uint64_t retaddr);
 };
 
 struct sk3wldbg_sparc64 : public sk3wldbg {
    sk3wldbg_sparc64();
+   bool save_ret_addr(uint64_t retaddr);
 };
 

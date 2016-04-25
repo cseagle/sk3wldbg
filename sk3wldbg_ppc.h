@@ -21,9 +21,11 @@
 
 struct sk3wldbg_ppc : public sk3wldbg {
    sk3wldbg_ppc();
+   bool save_ret_addr(uint64_t retaddr);
 };
 
 struct sk3wldbg_ppc64 : public sk3wldbg {
    sk3wldbg_ppc64();
+   bool save_ret_addr(uint64_t retaddr);
 };
 

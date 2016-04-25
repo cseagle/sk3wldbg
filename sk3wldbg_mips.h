@@ -21,9 +21,11 @@
 
 struct sk3wldbg_mips : public sk3wldbg {
    sk3wldbg_mips();
+   bool save_ret_addr(uint64_t retaddr);
 };
 
 struct sk3wldbg_mips64 : public sk3wldbg {
    sk3wldbg_mips64();
+   bool save_ret_addr(uint64_t retaddr);
 };
 

@@ -920,6 +920,19 @@ ea_t idaapi uni_appcall(
    msg("uni_appcall called\n");
    warning("TITLE Under Construction\nICON INFO\nAUTOHIDE NONE\nHIDECANCEL\nappcall is currently unimplemented");
    return BADADDR;
+   
+   
+   /*
+   sk3wldbg *uc = (sk3wldbg*)dbg;
+   uint64_t orig_sp = get_sp();
+   uint64_t orig_pc = get_pc();
+   if (!uc->save_registers()) {
+      *errbuf = "Failed to save current register values";
+      return BADADDR;
+   }
+   //set breakpoint at end of function
+   
+   */   
 }
 
 /// Cleanup after appcall().
@@ -937,6 +950,13 @@ ea_t idaapi uni_appcall(
 int idaapi uni_cleanup_appcall(thid_t /*tid*/) {
    msg("uni_cleanup_appcall called\n");
    return 1;
+
+/*
+   sk3wldbg *uc = (sk3wldbg*)dbg;
+   uc->restore_registers();
+
+   //remove breakpoint at end of function
+*/
 }
 
 /// Evaluate a low level breakpoint condition at 'ea'.
@@ -1039,6 +1059,7 @@ sk3wldbg::sk3wldbg(const char *procname, uc_arch arch, uc_mode mode, const char 
    run_sem = qsem_create(NULL, 0);
    emu_state = RS_INIT;
    process_thread = NULL;
+   saved = NULL;
    
 #ifdef __NT__
    hProv = NULL;
@@ -1335,4 +1356,31 @@ void sk3wldbg::install_initial_hooks() {
    if (err) {
       msg("Failed on uc_hook_add(generic_code_hook) with error returned: %u\n", err);
    }
+}
+
+bool sk3wldbg::save_registers() {
+   if (saved != NULL) {
+      //this should not happen, but what if it does?
+      qfree(saved);
+      saved = NULL;
+   }
+   saved = (regval_t*)qalloc(sizeof(regval_t) * registers_size);
+   if (uni_read_registers(0, -1, saved) == 0) {
+      qfree(saved);
+      saved = NULL;
+      return false;
+   }
+   return true;
+}
+
+bool sk3wldbg::restore_registers() {
+   if (saved == NULL ) {
+      return false;
+   }
+   for (int regidx = 0; regidx < registers_size; regidx++) {
+      uc_err err = uc_reg_write(uc, reg_map[regidx], &saved->ival);
+   }
+   qfree(saved);
+   saved = NULL;
+   return true;
 }

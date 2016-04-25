@@ -22,10 +22,12 @@
 struct sk3wldbg_arm : public sk3wldbg {
    sk3wldbg_arm();
    void check_mode(ea_t addr);
+   bool save_ret_addr(uint64_t retaddr);
 };
 
 struct sk3wldbg_aarch64 : public sk3wldbg {
    sk3wldbg_aarch64();
    void check_mode(ea_t addr);
+   bool save_ret_addr(uint64_t retaddr);
 };
 
