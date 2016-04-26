@@ -79,8 +79,13 @@ care of if you build Unicorn from source.
 As an alternative to building the plugin yourself, pre-built binaries for 
 IDA 6.9 (Windows, Linux, OS X), including 32-bit versions of the Unicorn 
 library are available in the bin directory. Install these per the instructions
-above. For start need add additional libraries (like libglib-2.0-0.dll, libintl-8.dll 
-...) near Unicorn1.dll or install msys2/cygwin:
+above. Pleasae note that the Unicorn library depends on glib-2.0 and libintl.
+For Linux users, make sure the 32-bit versions of these libraries are installed 
+using your package manager. For OS X users, these libraries may be installed 
+with brew or macports. Windows users will need libglib-2.0-0.dll, libintl-8.dll,
+libgcc_s_dw2-1.dll, and any other required libraries from Mingw or cygwin
+installed into their IDA directory or in a system search path. To install using
+msys2/cygwin:
 
 Msys2:
 
