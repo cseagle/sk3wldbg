@@ -84,13 +84,17 @@ struct sk3wldbg : public debugger_t {
    bool single_step;
    uint64_t suspend_pc;
    meminfo_vec_t memory;
-   //DO WE NEED TO LOCK push and pop from this?
    evt_list_t dbg_evt_list;
    qmutex_t evt_mutex;
    qsemaphore_t run_sem;
    run_state emu_state;
    qthread_t process_thread;
    regval_t *saved;
+   
+   uc_hook code_hook;
+   uc_hook mem_fault_hook;
+   
+   event_id_t last_eid;
    
    int32_t *reg_map;  //map of internal unicorn reg enums to dbg->_register index values
 
@@ -104,6 +108,7 @@ struct sk3wldbg : public debugger_t {
    bool dequeue_debug_evt(debug_event_t *out);
    size_t debug_queue_len() {return dbg_evt_list.size();}
 
+   bool queue_exception_event(uint32_t code, uint64_t mem_addr, const char *msg);
    bool queue_dbg_event(bool is_hardware);
    
    void close();
@@ -119,12 +124,15 @@ struct sk3wldbg : public debugger_t {
 
    void add_bpt(uint64_t bpt_addr);
    void del_bpt(uint64_t bpt_addr);
-   
+
+   bool read_register(int regidx, regval_t *values);
    bool save_registers();
    bool restore_registers();
    
+   virtual bool call_changes_sp() {return false;};
+   //emulate what this processor does when a function is called
    //some processors push, some processors save it in a register
-   //do the right thing here
+   //emulate the right thing here. This is to support appcall
    virtual bool save_ret_addr(uint64_t retaddr) = 0;
    
    bool done() {return finished;}

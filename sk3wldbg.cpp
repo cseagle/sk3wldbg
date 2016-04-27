@@ -25,6 +25,7 @@
  *  - Visual Studio 2010, Linux g++, OS X - clang
  *
  */
+#define USE_DANGEROUS_FUNCTIONS
 
 #ifdef __NT__
 #include <windows.h>
@@ -109,13 +110,29 @@ bool idaapi uni_term_debugger(void) {
    return true;
 }
 
+bool sk3wldbg::queue_exception_event(uint32_t code, uint64_t mem_addr, const char *errmsg) {
+   debug_event_t exc;
+   exc.eid = ::EXCEPTION;
+   exc.pid = the_process;
+   exc.tid = the_threads.front();
+   exc.ea = (ea_t)get_pc();
+   msg("Exception occurred at: 0x%llx\n", (uint64_t)exc.ea);
+   exc.handled = true;
+   exc.exc.code = code;
+   exc.exc.can_cont = false;
+   exc.exc.ea = (ea_t)mem_addr;
+   qstrncpy(exc.exc.info, errmsg, sizeof(exc.exc.info));
+   enqueue_debug_evt(exc);
+   return true;
+}
+
 bool sk3wldbg::queue_dbg_event(bool is_hardware) {
    debug_event_t brk;
    brk.eid = ::BREAKPOINT;
    brk.pid = the_process;
    brk.tid = the_threads.front();
    brk.ea = (ea_t)get_pc();
-   msg("x86 breakpoint hit at: 0x%llx\n", (uint64_t)brk.ea);
+   msg("Breakpoint hit at: 0x%llx\n", (uint64_t)brk.ea);
    brk.handled = true;
    brk.bpt.hea = is_hardware ? brk.ea : BADADDR;
    brk.bpt.kea = BADADDR;
@@ -212,7 +229,7 @@ int idaapi uni_start_process(const char * /*path*/,
    }
 
    uc->clear_memory();
-   
+
    uc->getRandomBytes(&uc->the_process, 2);
    uc->the_process = (uc->the_process % 40000) + 1000;
 
@@ -257,16 +274,16 @@ int idaapi uni_start_process(const char * /*path*/,
       //didn't know format, let's try for what we need from IDA
       //init memory, by copying from IDA
       //May prefer instead to init from file, in which case we need loaders
-      //Also need to map in a stack and init stack pointer, this will be 
+      //Also need to map in a stack and init stack pointer, this will be
       //architecture dependent since each arch has its own SP register
       //arch specific unicorns also need to set initial register state
       segment_t *seg;
       msg("uni_start_process copying memory called\n");
       for (seg = get_first_seg(); seg != NULL; seg = get_next_seg(seg->startEA)) {
          uint64_t exact = seg->endEA - seg->startEA;
-   
+
          uc->map_mem_zero(seg->startEA, seg->endEA, ida_to_uc_perms_map[seg->perm]);
-   
+
          void *buf = qcalloc(exact, 1);
          get_many_bytes_ex(seg->startEA, buf, exact, NULL);
          uc_err err = uc_mem_write(uc->uc, seg->startEA, buf, (size_t)exact);
@@ -275,20 +292,20 @@ int idaapi uni_start_process(const char * /*path*/,
          }
          qfree(buf);
       }
-   }   
+   }
 
    if (uc->get_sp() == 0) {
       //need a stack too, just sling it somewhere
       //add it to uc->memory
       unsigned int stack_top = 0xc0000000;
-      uc->map_mem_zero(stack_top - 0x100000, stack_top, UC_PROT_READ | UC_PROT_WRITE);   
+      uc->map_mem_zero(stack_top - 0x100000, stack_top, UC_PROT_READ | UC_PROT_WRITE);
       stack_top -= 16;
       uc->set_sp(stack_top);
    }
-   
+
    //init registers
    //register unicorn hooks
-   
+
    //need other ways to set PC, from start, user specified
    uc->set_pc(init_pc);
 
@@ -315,7 +332,7 @@ int idaapi uni_start_process(const char * /*path*/,
    uc->enqueue_debug_evt(start);
 
    msg("uni_start_process complete\n");
-   return 1;   
+   return 1;
 }
 
 /// Attach to an existing running process.
@@ -482,7 +499,7 @@ int idaapi uni_continue_after_event(const debug_event_t *event) {
          msg("uni_continue_after_event trying to step\n");
          //state should have been set in set_resume_mode
          qsem_post(uc->run_sem);
-/*         
+/*
          uc_err err = uc_emu_start(uc->uc, uc->get_pc(), 0, 0, 1);
          if (err != UC_ERR_OK) {
             return false;
@@ -498,6 +515,8 @@ int idaapi uni_continue_after_event(const debug_event_t *event) {
          break;
       case EXCEPTION:
          msg("uni_continue_after_event EXCEPTION\n");
+         //give it a try
+         qsem_post(uc->run_sem);
          break;
       case LIBRARY_LOAD:
          msg("uni_continue_after_event LIBRARY_LOAD\n");
@@ -626,14 +645,8 @@ int idaapi uni_read_registers(thid_t /*tid*/, int clsmask, regval_t *values) {
    //need to figure out how to do this across all unicorn archs
    for (int i = 0; i < uc->registers_size; i++) {
       if (uc->_registers[i].register_class & clsmask) {
-         int32_t rtype = RVT_INT;
-         if (uc->_registers[i].dtyp == dt_float || uc->_registers[i].dtyp == dt_double) {
-            rtype = RVT_FLOAT;
-         }
-         values[i].rvtype = rtype;
-         err = uc_reg_read(uc->uc, uc->reg_map[i], &values[i].ival);
-         if (err != UC_ERR_OK) {
-            break;
+         if (!uc->read_register(i, &values[i])) {
+            return 0;
          }
       }
    }
@@ -828,7 +841,7 @@ ea_t idaapi uni_map_address(ea_t off, const regval_t * /*regs*/, int /*regnum*/)
    and check against limit. Return valuse is either base + offset or BADADDR
    For this and other functions, need some helpers that read segment descriptors
 */
- 
+
 //   msg("uni_map_address called for 0x%llx\n", (uint64_t)off);
 /*
    meminfo_vec_t mv;
@@ -852,7 +865,7 @@ ea_t idaapi uni_map_address(ea_t off, const regval_t * /*regs*/, int /*regnum*/)
 /// This function is called from the main thread
 //Called with keyword == NULL indicates user has selected "Set specific options" button
 // in IDA's Debugger setup dialog
-const char *idaapi uni_set_dbg_options(const char *keyword, int /*pri*/, 
+const char *idaapi uni_set_dbg_options(const char *keyword, int /*pri*/,
                                 int value_type, const void *value) {
    msg("uni_set_dbg_options called: %s\n", keyword);
    if (value_type == IDPOPT_STR) {
@@ -920,19 +933,79 @@ ea_t idaapi uni_appcall(
    msg("uni_appcall called\n");
    warning("TITLE Under Construction\nICON INFO\nAUTOHIDE NONE\nHIDECANCEL\nappcall is currently unimplemented");
    return BADADDR;
-   
-   
-   /*
+
+/*
    sk3wldbg *uc = (sk3wldbg*)dbg;
-   uint64_t orig_sp = get_sp();
-   uint64_t orig_pc = get_pc();
    if (!uc->save_registers()) {
       *errbuf = "Failed to save current register values";
       return BADADDR;
    }
-   //set breakpoint at end of function
-   
-   */   
+   uint64_t addr_size = (inf.lflags & LFLG_64BIT) ? 8 :4;
+   uint64_t curr_sp = uc->get_sp() & ~0xf; //16 byte align for starters
+   curr_sp -= stkargs->size();  //claim the space we need for stack args
+   if (uc->call_changes_sp()) {
+      //if return address gets saved on the stack account for it
+      curr_sp -= addr_size;
+   }
+
+   curr_sp &= ~0xf;   //and realign
+
+   if (stkargs->relocate((ea_t)curr_sp, false) == 0) {
+      *errbuf = "Failed to relocate stack args";
+      return BADADDR;
+   }
+
+   //need an address that won't get hit during normal execution of the appcall
+   uint64_t appcall_brk = addr_size == 8 ? 0x4141414141414141LL : 0x41414141;
+   uc->add_bpt(appcall_brk);
+
+   uc->save_ret_addr(curr_sp);
+   //write the stack arguments into the stack
+   uc_mem_write(uc->uc, curr_sp + (uc->call_changes_sp() ? addr_size : 0), stkargs->begin(), (size_t)stkargs->size());
+
+   //copy regargs into parameter registers
+
+   //copy parameter registers
+   for (uint32_t i = 0; i < regargs->size(); i++) {
+      const regobj_t &ri = regargs->at(i);
+      int regidx = ri.regidx;
+      if (ri.relocate && (ri.size() <= addr_size)) {
+         uint64_t relocated = 0;
+         memcpy(&relocated, ri.value.begin(), ri.size());
+         relocated += curr_sp;
+         uc_reg_write(uc->uc, uc->reg_map[regidx], &relocated);
+      }
+      else {
+         uc_reg_write(uc->uc, uc->reg_map[regidx], ri.value.begin());
+      }
+   }
+   uc->set_pc(func_ea);
+
+   //continue execution until we hit the appcall_brk
+
+   if ((options & APPCALL_MANUAL) != 0) {
+      return (ea_t)curr_sp;
+   }
+
+   //some registers hold return values
+   // Retrieve the return value
+   if (retregs != NULL) {
+      for (uint32_t i = 0; i < retregs->size(); i++) {
+         regobj_t &r = retregs->at(i);
+         regval_t rv;
+         if (uc->read_register(r.regidx, &rv)) {
+            memcpy(r.value.begin(), &rv.ival, r.value.size());
+            r.relocate = false;
+         }
+      }
+   }
+
+   //now restore pre-appcall context
+   uc->restore_registers();
+   uc->del_bpt(appcall_brk);
+
+   return (ea_t)curr_sp;
+*/
 }
 
 /// Cleanup after appcall().
@@ -1060,20 +1133,22 @@ sk3wldbg::sk3wldbg(const char *procname, uc_arch arch, uc_mode mode, const char 
    emu_state = RS_INIT;
    process_thread = NULL;
    saved = NULL;
-   
+   code_hook = 0;
+   mem_fault_hook = 0;
+
 #ifdef __NT__
    hProv = NULL;
 #else
    hProv = -1;
 #endif
-   
+
    do_suspend = false;
    finished = false;
    single_step = false;
    if (inf.mf) {
       debug_mode = (uc_mode)((int)UC_MODE_BIG_ENDIAN | (int)debug_mode);
-   }   
-   
+   }
+
    id = 0x100;       //debugger id. Can we use one of the existing constants?
    processor = procname;
    flags =   DBG_FLAG_CAN_CONT_BPT | DBG_FLAG_SAFE | DBG_FLAG_DEBTHREAD
@@ -1169,6 +1244,14 @@ bool sk3wldbg::dequeue_debug_evt(debug_event_t *out) {
 }
 
 void sk3wldbg::close() {
+   if (code_hook) {
+      uc_hook_del(uc, code_hook);
+      code_hook = 0;
+   }
+   if (mem_fault_hook) {
+      uc_hook_del(uc, mem_fault_hook);
+      mem_fault_hook = 0;
+   }  
    uc_close(uc);
 //   uc = NULL;
 }
@@ -1340,6 +1423,34 @@ bool sk3wldbg::set_sp(uint64_t sp) {
    return false;
 }
 
+bool generic_mem_fault_hook(uc_engine *uc, uc_mem_type type, uint64_t address,
+                            int /*size*/, int64_t value, sk3wldbg *dbg) {
+   char msg[1024];
+   msg[0] = 0;
+   switch (type) {
+      case UC_MEM_READ_UNMAPPED:
+         qsnprintf(msg, sizeof(msg), "The instruction at 0x%llx attempted to read from unmapped memory", (uint64_t)address);
+         break;
+      case UC_MEM_WRITE_UNMAPPED:
+         qsnprintf(msg, sizeof(msg), "The instruction at 0x%llx attempted to write to unmapped memory", (uint64_t)address);
+         break;
+      case UC_MEM_FETCH_UNMAPPED:
+         qsnprintf(msg, sizeof(msg), "The instruction at 0x%llx attempted to execute from unmapped memory", (uint64_t)address);
+         break;
+      case UC_MEM_WRITE_PROT:
+         qsnprintf(msg, sizeof(msg), "The instruction at 0x%llx attempted to write to write protected memory", (uint64_t)address);
+         break;
+      case UC_MEM_READ_PROT:
+         qsnprintf(msg, sizeof(msg), "The instruction at 0x%llx attempted to read from read protected unmapped memory", (uint64_t)address);
+         break;
+      case UC_MEM_FETCH_PROT:
+         qsnprintf(msg, sizeof(msg), "The instruction at 0x%llx attempted to fetch from NX memory", (uint64_t)address);
+         break;
+   }
+   dbg->queue_exception_event(11, address, msg);   
+   return false;
+}
+
 void generic_code_hook(uc_engine *uc, uint64_t address, uint32_t /*size*/, sk3wldbg *dbg) {
    static uint64_t last_pc;
 //   msg("code hit at: 0x%llx\n", address);
@@ -1351,11 +1462,25 @@ void generic_code_hook(uc_engine *uc, uint64_t address, uint32_t /*size*/, sk3wl
 }
 
 void sk3wldbg::install_initial_hooks() {
-   uc_hook hh;
-   uc_err err = uc_hook_add(uc, &hh, UC_HOOK_CODE, (void*)generic_code_hook, this, 1, 0);
+   uc_err err = uc_hook_add(uc, &code_hook, UC_HOOK_CODE, (void*)generic_code_hook, this, 1, 0);
    if (err) {
+      code_hook = 0;
       msg("Failed on uc_hook_add(generic_code_hook) with error returned: %u\n", err);
    }
+   err = uc_hook_add(uc, &mem_fault_hook, UC_HOOK_MEM_INVALID, (void*)generic_mem_fault_hook, this, 1, 0);
+   if (err) {
+      mem_fault_hook = 0;
+      msg("Failed on uc_hook_add(generic_mem_fault_hook) with error returned: %u\n", err);
+   }
+}
+
+bool sk3wldbg::read_register(int regidx, regval_t *value) {
+   int32_t rtype = RVT_INT;
+   if (_registers[regidx].dtyp == dt_float || _registers[regidx].dtyp == dt_double) {
+      rtype = RVT_FLOAT;
+   }
+   value->rvtype = rtype;
+   return uc_reg_read(uc, reg_map[regidx], &value->ival) == UC_ERR_OK;
 }
 
 bool sk3wldbg::save_registers() {
