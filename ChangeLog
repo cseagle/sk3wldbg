@@ -1,3 +1,5 @@
+* 5/31/16
+  Change binary name to sk3wldbg_user because IDA wants an _ in debugger names
 * 4/26/16
   Initial efforts to handle memory access errors
   Updated binaries

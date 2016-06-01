@@ -15,7 +15,7 @@ IDA=$(dir $(BIN))
 endif
 
 #Set this variable to the desired name of your compiled plugin
-PROC=sk3wldbg
+PROC=sk3wldbg_user
 
 ifeq "$(PLATFORM)" "MINGW32"
 PLATFORM_CFLAGS=-D__NT__ -D__IDP__ -DWIN32 -Os -fno-rtti

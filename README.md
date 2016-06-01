@@ -45,8 +45,8 @@ Compiled binaries will end up in $IDASDKDIR/bin/plugins
 
 Build with Visual Studio C++ 2010 or later using the included solution (.sln)
 file. Build targets are included for IDA 32-bit (Release) and IDA 64-bit 
-(Release64). These produce sk3wldbg.plw and sk3wldbg.p64 respectively. Note 
-that the project configuration assumes that the Unicorn library headers have
+(Release64). These produce sk3wldbg_user.plw and sk3wldbg_user.p64 respectively.
+Note that the project configuration assumes that the Unicorn library headers have
 been copied into the sk3wldbg directory alongside the solution file (this is
 already done in the git repo). If you want to switch to using the actual Unicorn
 headers, make sure you update the Visual Studio project settings.
