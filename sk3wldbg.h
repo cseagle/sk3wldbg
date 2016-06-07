@@ -38,6 +38,7 @@
 #include <pro.h>
 #include <ida.hpp>
 #include <idd.hpp>
+#include <kernwin.hpp>
 
 #include <set>
 
@@ -108,6 +109,7 @@ struct sk3wldbg : public debugger_t {
    bool dequeue_debug_evt(debug_event_t *out);
    size_t debug_queue_len() {return dbg_evt_list.size();}
 
+   void runtime_exception(uc_err err, uint64_t pc);
    bool queue_exception_event(uint32_t code, uint64_t mem_addr, const char *msg);
    bool queue_dbg_event(bool is_hardware);
    
@@ -140,6 +142,11 @@ struct sk3wldbg : public debugger_t {
    bool set_pc(uint64_t);
    uint64_t get_sp();
    bool set_sp(uint64_t);
+};
+
+struct mem_map_action_handler : public action_handler_t {
+   int idaapi activate(action_activation_ctx_t *ctx);
+   action_state_t idaapi update(action_update_ctx_t *ctx);
 };
 
 #endif

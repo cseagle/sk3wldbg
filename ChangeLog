@@ -1,3 +1,6 @@
+* 6/6/16
+  Sync to latest Unicorn
+  Don't call ANY IDA functions from Unicorn thread!
 * 5/31/16
   Change binary name to sk3wldbg_user because IDA wants an _ in debugger names
 * 4/26/16

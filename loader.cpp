@@ -213,7 +213,7 @@ bool loadElf64(sk3wldbg *uc, void *img, uint64_t sz) {
 
 bool loadElf32(sk3wldbg *uc, void *img, size_t sz) {
    ELF32_Ehdr *elf = (ELF32_Ehdr*)img;
-   if (memcmp(elf->e_ident, "\x7f" "ELF", 4) != 0) {
+   if (memcmp(elf->e_ident, "\x7f" "ELF", 4) != 0 && memcmp(elf->e_ident, "\x7f" "CGC", 4) != 0) {
       msg("bad ELF magic: 0x%x\n", *(uint32_t*)elf->e_ident);
       return false;
    }
