@@ -83,9 +83,9 @@ above. Pleasae note that the Unicorn library depends on glib-2.0 and libintl.
 For Linux users, make sure the 32-bit versions of these libraries are installed 
 using your package manager. For OS X users, these libraries may be installed 
 with brew or macports. Windows users will need libglib-2.0-0.dll, libintl-8.dll,
-libgcc_s_dw2-1.dll, and any other required libraries from Mingw or cygwin
-installed into their IDA directory or in a system search path. To install using
-msys2/cygwin:
+libgcc_s_dw2-1.dll, libwinpthread-1.dll, libiconv-2.dll, and any other required
+libraries from Mingw or cygwin installed into their IDA directory or in a system
+search path. To install using msys2/cygwin:
 
 Msys2:
 
