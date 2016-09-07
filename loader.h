@@ -22,10 +22,10 @@
 
 #include "sk3wldbg.h"
 
-bool loadImage(sk3wldbg *uc, void *img, size_t sz);
-bool loadPE64(sk3wldbg *uc, void *img, size_t sz);
-bool loadPE32(sk3wldbg *uc, void *img, size_t sz);
-bool loadElf64(sk3wldbg *uc, void *img, size_t sz);
-bool loadElf32(sk3wldbg *uc, void *img, size_t sz);
+bool loadImage(sk3wldbg *uc, void *img, size_t sz, const char *args);
+bool loadPE64(sk3wldbg *uc, void *img, size_t sz, const char *args);
+bool loadPE32(sk3wldbg *uc, void *img, size_t sz, const char *args);
+bool loadElf64(sk3wldbg *uc, void *img, size_t sz, const char *args);
+bool loadElf32(sk3wldbg *uc, void *img, size_t sz, const char *args);
 
 #endif

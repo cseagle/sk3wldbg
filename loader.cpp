@@ -18,11 +18,14 @@
 */
 
 #include <ida.hpp>
+#include <llong.hpp>
+#include <nalt.hpp>
 #include "loader.h"
 
 struct ELF32_Ehdr {
    uint8_t  e_ident[16];
 #define ELF_IDENT  "\177ELF\x01\x01\x01"
+#define EI_DATA 5           // endian-ness   1 == little-endian, 2 == big-endian
    uint16_t e_type;         /* Must be 2 for executable */
    uint16_t e_machine;      /* Must be 3 for i386 */
    uint32_t e_version;      /* Must be 1 */
@@ -40,7 +43,14 @@ struct ELF32_Ehdr {
 
 struct ELF32_Phdr {
    uint32_t        p_type;         /* Section type */
-#define PT_LOAD     1               /* Segment loaded into mem */
+
+#define PT_LOAD      1
+#define PT_LOOS      0x60000000
+#define PT_HIOS      0x6fffffff
+#define PT_LOPROC    0x70000000
+#define PT_HIPROC    0x7fffffff
+#define PT_GNU_STACK (PT_LOOS + 0x474e551)
+
    uint32_t        p_offset;       /* Offset into the file */
    uint32_t        p_vaddr;        /* Virtual program address */
    uint32_t        p_paddr;        /* Set to zero */
@@ -91,16 +101,15 @@ static unsigned int ida_to_uc_perms_map_win[] = {
    UC_PROT_WRITE, UC_PROT_EXEC | UC_PROT_WRITE, UC_PROT_READ | UC_PROT_WRITE, UC_PROT_ALL
 };
 
-bool loadPE64(sk3wldbg *uc, void *img, size_t /*sz*/) {
-   //TODO implement this loader!
+bool loadPE64(sk3wldbg *uc, void *img, size_t /*sz*/, const char * /*args*/) {
    if (memcmp(img, "MZ", 2) != 0) {
       msg("bad MZ magic\n");
-      return false;      
+      return false;
    }
    unsigned char *pe = (unsigned char*)(*(int*)(0x3c + (char*)img) + (char*)img);
    if (memcmp(pe, "PE\x00\x00", 4) != 0) {
       msg("bad PE signature\n");
-      return false;      
+      return false;
    }
    unsigned int nsect = *(unsigned short*)(pe + 6);
    unsigned int ohdr = *(unsigned short*)(pe + 20);
@@ -122,7 +131,7 @@ bool loadPE64(sk3wldbg *uc, void *img, size_t /*sz*/) {
 
    //PE stack
    unsigned int stack_top = 0x130000;
-   uc->map_mem_zero(stack_top - 0x100000, stack_top, UC_PROT_READ | UC_PROT_WRITE);
+   uc->map_mem_zero(stack_top - 0x100000, stack_top, UC_PROT_READ | UC_PROT_WRITE | UC_PROT_EXEC);
 
    stack_top -= 16;
    uc->set_sp(stack_top);
@@ -130,15 +139,15 @@ bool loadPE64(sk3wldbg *uc, void *img, size_t /*sz*/) {
    return true;
 }
 
-bool loadPE32(sk3wldbg *uc, void *img, size_t /*sz*/) {
+bool loadPE32(sk3wldbg *uc, void *img, size_t /*sz*/, const char * /*args*/) {
    if (memcmp(img, "MZ", 2) != 0) {
       msg("bad MZ magic\n");
-      return false;      
+      return false;
    }
    unsigned char *pe = (unsigned char*)(*(int*)(0x3c + (char*)img) + (char*)img);
    if (memcmp(pe, "PE\x00\x00", 4) != 0) {
       msg("bad PE signature\n");
-      return false;      
+      return false;
    }
    unsigned int nsect = *(unsigned short*)(pe + 6);
    unsigned int ohdr = *(unsigned short*)(pe + 20);
@@ -160,7 +169,7 @@ bool loadPE32(sk3wldbg *uc, void *img, size_t /*sz*/) {
 
    //PE stack
    unsigned int stack_top = 0x130000;
-   uc->map_mem_zero(stack_top - 0x100000, stack_top, UC_PROT_READ | UC_PROT_WRITE);
+   uc->map_mem_zero(stack_top - 0x100000, stack_top, UC_PROT_READ | UC_PROT_WRITE | UC_PROT_EXEC);
 
    stack_top -= 16;
    uc->set_sp(stack_top);
@@ -168,29 +177,200 @@ bool loadPE32(sk3wldbg *uc, void *img, size_t /*sz*/) {
    return true;
 }
 
-bool loadElf64(sk3wldbg *uc, void *img, uint64_t sz) {
+//IDA only runs on little-endian platforms
+uint16_t get_elf_16(void *pdata, bool big_endian) {
+   uint16_t *d = (uint16_t*)pdata;
+   return big_endian ? swap16(*d) : *d;
+}
+
+uint32_t get_elf_32(void *pdata, bool big_endian) {
+   uint32_t *d = (uint32_t*)pdata;
+   return big_endian ? swap32(*d) : *d;
+}
+
+uint64_t get_elf_64(void *pdata, bool big_endian) {
+   uint64_t *d = (uint64_t*)pdata;
+   return big_endian ? swap64(*d) : *d;
+}
+
+static uint64_t uc_push_8(sk3wldbg *uc, uint64_t sp, uint8_t val) {
+   sp -= 1;
+   uc_mem_write(uc->uc, sp, &val, 1);
+   return sp;
+}
+
+static uint64_t uc_push_32(sk3wldbg *uc, uint64_t sp, uint32_t val, bool big_endian) {
+   sp -= sizeof(val);
+   if (big_endian) {
+      val = swap32(val);
+   }
+   uc_mem_write(uc->uc, sp, &val, sizeof(val));
+   return sp;
+}
+
+static uint64_t uc_push_64(sk3wldbg *uc, uint64_t sp, uint64_t val, bool big_endian) {
+   sp -= sizeof(val);
+   if (big_endian) {
+      val = swap64(val);
+   }
+   uc_mem_write(uc->uc, sp, &val, sizeof(val));
+   return sp;
+}
+
+static uint64_t uc_push(sk3wldbg *uc, uint64_t sp, uint64_t val, bool is_64, bool big_endian) {
+   if (is_64) {
+      return uc_push_64(uc, sp, val, big_endian);
+   }
+   return uc_push_32(uc, sp, (uint32_t)val, big_endian);
+}
+
+static uint64_t uc_push_buf(sk3wldbg *uc, uint64_t sp, void *val, uint32_t sz) {
+   sp -= sz;
+   uc_mem_write(uc->uc, sp, val, sz);
+   return sp;
+}
+
+static uint64_t uc_push_str(sk3wldbg *uc, uint64_t sp, const char *val, bool with_null = true) {
+   size_t sz = strlen(val);
+   if (with_null) {
+      sz++;
+   }
+   return uc_push_buf(uc, sp, (void*)val, sz);
+}
+
+static uint64_t create_elf_env(sk3wldbg *uc, uint64_t sp, const char *args, bool is_64, bool big_endian) {
+   char bin[256];
+   qvector<uint64_t> env;
+   qvector<uint64_t> argv;
+   qvector<qstring> arguments;
+   ssize_t bin_len = get_root_filename(bin, sizeof(bin));
+   sp = uc_push(uc, sp, 0, is_64, big_endian);
+   sp = uc_push_str(uc, sp, bin);
+   sp = uc_push_str(uc, sp, "_=./", false);
+   env.push_back(sp);
+   sp = uc_push_str(uc, sp, "HOME=/home/user");
+   env.push_back(sp);
+   sp = uc_push_str(uc, sp, "PWD=/home/user");
+   env.push_back(sp);
+   sp = uc_push_str(uc, sp, "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin");
+   env.push_back(sp);
+   sp = uc_push_str(uc, sp, "SHELL=/bin/bash");
+   env.push_back(sp);
+
+   qstring argv_0 = "./";
+   argv_0 += bin;
+   arguments.push_back(argv_0);
+   const char *p1 = args;
+   while (true) {
+      while (isspace(*p1)) p1++;
+      qstring arg;
+      if (*p1) {
+         char quote = 0;
+         if (*p1 == '"' || *p1 == '\'') {
+            quote = *p1++;
+         }
+         while (*p1) {
+            if (*p1 == '\\') {
+               //need better escape handling, only handling escaped quotes for now
+               p1++;
+               if (*p1 == 0) {
+                  p1--;
+               }
+            }
+            else if (quote) {
+               if (*p1 == quote) {
+                  p1++;
+                  break;
+               }
+            }
+            else if (isspace(*p1)) {
+               break;
+            }
+            arg += *p1++;
+         }
+         if (arg.length() > 0) {
+            arguments.push_back(arg);
+         }
+      }
+      else {
+         break;
+      }
+   }
+
+   while (arguments.size() > 0) {
+      qstring &a = arguments.back();
+      sp = uc_push_str(uc, sp, a.c_str());
+      argv.push_back(sp);
+      arguments.pop_back();
+   }
+
+   sp &= is_64 ? ~7 : ~3;   //align sp to 4 or 8 bytes
+
+   //need to build an AUX vector here
+   //For now we just write an AT_NULL entry
+   sp = uc_push(uc, sp, 0, is_64, big_endian);
+   sp = uc_push(uc, sp, 0, is_64, big_endian);
+
+   //null terminate envp array
+   sp = uc_push(uc, sp, 0, is_64, big_endian);
+   //push envp pointers
+   for (qvector<uint64_t>::iterator i = env.begin(); i != env.end(); i++) {
+      sp = uc_push(uc, sp, *i, is_64, big_endian);   
+   }
+
+   //null terminate argv array
+   sp = uc_push(uc, sp, 0, is_64, big_endian);
+   //remember argc
+   uint32_t argc = argv.size();
+
+   //push argv pointers   
+   for (qvector<uint64_t>::iterator i = argv.begin(); i != argv.end(); i++) {
+      sp = uc_push(uc, sp, *i, is_64, big_endian);   
+   }
+   //push argc
+   sp = uc_push(uc, sp, argc, is_64, big_endian);
+   
+   return sp;
+}
+
+bool loadElf64(sk3wldbg *uc, void *img, uint64_t sz, const char *args) {
    Elf64_Ehdr *elf = (Elf64_Ehdr*)img;
+   uint32_t exec_stack = UC_PROT_EXEC;
+   bool big_endian = false;
+
    if (memcmp(elf->e_ident, "\x7f" "ELF", 4) != 0) {
       msg("bad ELF magic: 0x%x\n", *(uint32_t*)elf->e_ident);
       return false;
    }
-   if (elf->e_phoff > (sz - sizeof(Elf64_Phdr))) {
+   if (elf->e_ident[EI_DATA] == 2) {
+      big_endian = true;
+   }
+   uint64_t e_phoff = get_elf_64(&elf->e_phoff, big_endian);
+   if (e_phoff > (sz - sizeof(Elf64_Phdr))) {
       msg("bad e_phoff\n");
       return false;
    }
-   Elf64_Phdr *phdr = (Elf64_Phdr*)(elf->e_phoff + (char*)img);
-   for (uint16_t i = 0; i < elf->e_phnum; i++) {
-      msg("phdr->p_type: %d\n", phdr->p_type);
-      if (phdr->p_type == PT_LOAD) {
-         uint64_t begin = phdr->p_vaddr & ~0xfff;
-         uint64_t end = (phdr->p_vaddr + phdr->p_memsz + 0xfff) & ~0xfff;
-         msg("ELF64 loader mapping 0x%llx bytes at 0x%llx, from file offset 0x%llx\n", (uint64_t)phdr->p_memsz,
-             (uint64_t)phdr->p_vaddr, (uint64_t)phdr->p_offset);
-         uc->map_mem_zero(begin, end, ida_to_uc_perms_map[phdr->p_flags & 7]);
-         uint64_t offset = phdr->p_offset & ~0xfff;
-         uint64_t endoff = (phdr->p_offset + phdr->p_filesz + 0xfff) & ~0xfff;
+   Elf64_Phdr *phdr = (Elf64_Phdr*)(e_phoff + (char*)img);
+   uint16_t e_phnum = get_elf_16(&elf->e_phnum, big_endian);
+   for (uint16_t i = 0; i < e_phnum; i++) {
+      uint32_t p_type = get_elf_32(&phdr->p_type, big_endian);
+      uint32_t p_flags = get_elf_32(&phdr->p_flags, big_endian);
+      msg("phdr->p_type: %d\n", p_type);
+      if (p_type == PT_LOAD) {
+         uint64_t p_vaddr = get_elf_64(&phdr->p_vaddr, big_endian);
+         uint64_t p_memsz = get_elf_64(&phdr->p_memsz, big_endian);
+         uint64_t p_offset = get_elf_64(&phdr->p_offset, big_endian);
+         uint64_t p_filesz = get_elf_64(&phdr->p_filesz, big_endian);
+
+         uint64_t begin = p_vaddr & ~0xfff;
+         uint64_t end = (p_vaddr + p_memsz + 0xfff) & ~0xfff;
+         msg("ELF64 loader mapping 0x%llx bytes at 0x%llx, from file offset 0x%llx\n", 
+               (uint64_t)p_memsz, (uint64_t)p_vaddr, (uint64_t)p_offset);
+         uc->map_mem_zero(begin, end, ida_to_uc_perms_map[p_flags & 7]);
+         uint64_t offset = p_offset & ~0xfff;
+         uint64_t endoff = (p_offset + p_filesz + 0xfff) & ~0xfff;
          if (endoff > sz) {
-            endoff = phdr->p_offset + phdr->p_filesz;
+            endoff = p_offset + p_filesz;
          }
          msg("Copying bytes 0x%llx:0x%llx into block\n", (uint64_t)offset, (uint64_t)endoff);
          uc_err err = uc_mem_write(uc->uc, begin, offset + (char*)img, (size_t)(endoff - offset));
@@ -198,41 +378,62 @@ bool loadElf64(sk3wldbg *uc, void *img, uint64_t sz) {
             msg("uc_mem_write failed with error: %d\n", err);
          }
       }
+      else if (p_type == PT_GNU_STACK) {
+         if ((p_flags & PF_X) == 0) {
+            //stack marked NX
+            exec_stack = 0;
+         }
+      }
       phdr++;
-   }   
+   }
 
    //ELF stack
    uint64_t stack_top = 0x7ffffffff000ll;
-   uc->map_mem_zero(stack_top - 0x100000, stack_top, UC_PROT_READ | UC_PROT_WRITE);
+   uc->map_mem_zero(stack_top - 0x100000, stack_top, UC_PROT_READ | UC_PROT_WRITE | exec_stack);
 
-   stack_top -= 16;
+   stack_top = create_elf_env(uc, stack_top, args, true, big_endian);
    uc->set_sp(stack_top);
 
    return true;
 }
 
-bool loadElf32(sk3wldbg *uc, void *img, size_t sz) {
+bool loadElf32(sk3wldbg *uc, void *img, size_t sz, const char *args) {
    ELF32_Ehdr *elf = (ELF32_Ehdr*)img;
+   uint32_t exec_stack = UC_PROT_EXEC;
+   bool big_endian = false;
+
    if (memcmp(elf->e_ident, "\x7f" "ELF", 4) != 0 && memcmp(elf->e_ident, "\x7f" "CGC", 4) != 0) {
       msg("bad ELF magic: 0x%x\n", *(uint32_t*)elf->e_ident);
       return false;
    }
-   if (elf->e_phoff > (sz - sizeof(ELF32_Phdr))) {
+   if (elf->e_ident[EI_DATA] == 2) {
+      big_endian = true;
+   }
+   uint32_t e_phoff = get_elf_32(&elf->e_phoff, big_endian);
+   if (e_phoff > (sz - sizeof(ELF32_Phdr))) {
       msg("bad e_phoff\n");
       return false;
    }
-   ELF32_Phdr *phdr = (ELF32_Phdr*)(elf->e_phoff + (char*)img);
-   for (uint16_t i = 0; i < elf->e_phnum; i++) {
-      msg("phdr->p_type: %d\n", phdr->p_type);
-      if (phdr->p_type == PT_LOAD) {
-         ea_t begin = phdr->p_vaddr & ~0xfff;
-         ea_t end = (phdr->p_vaddr + phdr->p_memsz + 0xfff) & ~0xfff;
-         msg("ELF32 loader mapping 0x%x bytes at 0x%x, from file offset 0x%x\n", phdr->p_memsz, phdr->p_vaddr, phdr->p_offset);
-         uc->map_mem_zero(begin, end, ida_to_uc_perms_map[phdr->p_flags & 7]);
-         size_t offset = phdr->p_offset & ~0xfff;
-         size_t endoff = (phdr->p_offset + phdr->p_filesz + 0xfff) & ~0xfff;
+   ELF32_Phdr *phdr = (ELF32_Phdr*)(e_phoff + (char*)img);
+   uint16_t e_phnum = get_elf_16(&elf->e_phnum, big_endian);
+   for (uint16_t i = 0; i < e_phnum; i++) {
+      uint32_t p_type = get_elf_32(&phdr->p_type, big_endian);
+      uint32_t p_flags = get_elf_32(&phdr->p_flags, big_endian);
+      msg("phdr->p_type: %d\n", p_type);
+      if (p_type == PT_LOAD) {
+         uint32_t p_vaddr = get_elf_32(&phdr->p_vaddr, big_endian);
+         uint32_t p_memsz = get_elf_32(&phdr->p_memsz, big_endian);
+         uint32_t p_offset = get_elf_32(&phdr->p_offset, big_endian);
+         uint32_t p_filesz = get_elf_32(&phdr->p_filesz, big_endian);
+
+         ea_t begin = p_vaddr & ~0xfff;
+         ea_t end = (p_vaddr + p_memsz + 0xfff) & ~0xfff;
+         msg("ELF32 loader mapping 0x%x bytes at 0x%x, from file offset 0x%x\n", p_memsz, p_vaddr, p_offset);
+         uc->map_mem_zero(begin, end, ida_to_uc_perms_map[p_flags & 7]);
+         size_t offset = p_offset & ~0xfff;
+         size_t endoff = (p_offset + p_filesz + 0xfff) & ~0xfff;
          if (endoff > sz) {
-            endoff = phdr->p_offset + phdr->p_filesz;
+            endoff = p_offset + p_filesz;
          }
          msg("Copying bytes 0x%llx:0x%llx into block\n", (uint64_t)offset, (uint64_t)endoff);
          uc_err err = uc_mem_write(uc->uc, begin, offset + (char*)img, endoff - offset);
@@ -240,40 +441,46 @@ bool loadElf32(sk3wldbg *uc, void *img, size_t sz) {
             msg("uc_mem_write failed with error: %d\n", err);
          }
       }
+      else if (p_type == PT_GNU_STACK) {
+         if ((p_flags & PF_X) == 0) {
+            //stack marked NX
+            exec_stack = 0;
+         }
+      }
       phdr++;
-   }   
+   }
 
    //ELF stack
-   unsigned int stack_top = 0xC0000000;
-   uc->map_mem_zero(stack_top - 0x100000, stack_top, UC_PROT_READ | UC_PROT_WRITE);
+   uint32_t stack_top = 0xC0000000;
+   uc->map_mem_zero(stack_top - 0x100000, stack_top, UC_PROT_READ | UC_PROT_WRITE | exec_stack);
 
-   stack_top -= 16;
+   stack_top = (uint32_t)create_elf_env(uc, stack_top, args, false, big_endian);
    uc->set_sp(stack_top);
 
    return true;
 }
 
-bool loadImage(sk3wldbg *uc, void *img, size_t sz) {
+bool loadImage(sk3wldbg *uc, void *img, size_t sz, const char *args) {
    bool result = false;
    switch (uc->filetype) {
       case f_PE:
          if (inf.lflags & LFLG_64BIT) {
             msg("loadPE64\n");
-            result = loadPE64(uc, img, sz);
+            result = loadPE64(uc, img, sz, args);
          }
          else {
             msg("loadPE32\n");
-            result = loadPE32(uc, img, sz);
+            result = loadPE32(uc, img, sz, args);
          }
          break;
       case f_ELF:
          if (inf.lflags & LFLG_64BIT) {
             msg("loadElf64\n");
-            result = loadElf64(uc, img, (uint64_t)sz);
+            result = loadElf64(uc, img, (uint64_t)sz, args);
          }
          else {
             msg("loadElf32\n");
-            result = loadElf32(uc, img, sz);
+            result = loadElf32(uc, img, sz, args);
          }
          break;
       default:

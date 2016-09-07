@@ -79,12 +79,23 @@ static unsigned int uc_to_ida_perms_map[] = {
    SEGPERM_EXEC, SEGPERM_EXEC | SEGPERM_READ, SEGPERM_EXEC | SEGPERM_WRITE, SEGPERM_EXEC | SEGPERM_WRITE | SEGPERM_WRITE
 };
 
+struct safe_msg : public exec_request_t {
+   const char *the_msg;
+   safe_msg(const char *msg) : the_msg(msg) {};
+   int idaapi execute(void);
+};
+
+int idaapi safe_msg::execute() {
+   msg(the_msg);
+   return 0;
+}
+
 /// Initialize debugger.
 /// This function is called from the main thread.
 /// \return success
 bool idaapi uni_init_debugger(const char * /*hostname*/, int /*portnum*/, const char * /*password*/) {
    sk3wldbg *uc = (sk3wldbg*)dbg;
-//   msg("uni_init_debugger called\n");
+   msg("uni_init_debugger called\n");
    return true;
 }
 
@@ -93,7 +104,9 @@ bool idaapi uni_init_debugger(const char * /*hostname*/, int /*portnum*/, const 
 /// \return success
 bool idaapi uni_term_debugger(void) {
    sk3wldbg *uc = (sk3wldbg*)dbg;
-//   msg("uni_term_debugger called\n");
+   msg("uni_term_debugger called\n");
+//   safe_msg req("uni_term_debugger called\n");
+//   execute_sync(req, MFF_FAST);
    if (uc->uc) {
       uc_emu_stop(uc->uc);
       uc->emu_state = RS_TERM;
@@ -102,8 +115,16 @@ bool idaapi uni_term_debugger(void) {
       qthread_join(uc->process_thread);
 //      msg("uni_term_debugger thread joined\n");
       uc->close();
+
+      if (uc->registered_menu) {
+         detach_action_from_menu("Debugger/Take memory snapshot", "sk3wldbg:mem_map");
+//         unregister_action("sk3wldbg:mem_map");
+         uc->registered_menu = false;
+      }
+//      uc->uc = NULL;
    }
-//   msg("uni_term_debugger complete\n");
+//   safe_msg req2("uni_term_debugger complete\n");
+//   execute_sync(req2, MFF_FAST);
    return true;
 }
 
@@ -137,6 +158,17 @@ bool sk3wldbg::queue_dbg_event(bool is_hardware) {
    return true;
 }
 
+struct print_pc : public exec_request_t {
+   uint64_t pc;
+   print_pc(uint64_t _pc) : pc(_pc) {};
+   int idaapi execute(void);
+};
+
+int idaapi print_pc::execute() {
+   msg("processRunner running from 0x%llx\n", (uint64_t)pc);
+   return 0;
+}
+
 int idaapi processRunner(void *unicorn) {
    sk3wldbg *uc = (sk3wldbg*)unicorn;
    //this is going to have to run in a separate thread otherwise other
@@ -146,6 +178,8 @@ int idaapi processRunner(void *unicorn) {
       qsem_wait(uc->run_sem, -1);
       //pick this up every time we start in case user changed the PC manually
       uint64_t _pc = uc->get_pc();
+//      print_pc req(_pc);
+//      execute_sync(req, MFF_FAST);
       switch (uc->emu_state) {
          case RS_INIT:
             break;
@@ -188,6 +222,19 @@ int idaapi uni_process_get_info(int n, process_info_t *info) {
    return 1;
 }
 
+struct install_menu : public exec_request_t {
+   sk3wldbg *uc;
+   install_menu(sk3wldbg *_uc) : uc(_uc) {};
+   int idaapi execute(void);
+};
+
+int idaapi install_menu::execute() {
+   attach_action_to_menu("Debugger/Take memory snapshot", "sk3wldbg:mem_map", SETMENU_APP);
+   enable_menu_item("Debugger/Map memory...", false);
+   uc->registered_menu = true;
+   return 0;
+}
+
 /// Start an executable to debug.
 /// This function is called from debthread.
 /// \param path              path to executable
@@ -204,7 +251,7 @@ int idaapi uni_process_get_info(int n, process_info_t *info) {
 /// \retval  1 | #CRC32_MISMATCH  ok, but the input file crc does not match
 /// \retval -1                    network error
 int idaapi uni_start_process(const char * /*path*/,
-                  const char * /*args*/,
+                  const char *args,
                   const char * /*startdir*/,
                   int /*dbg_proc_flags*/,
                   const char *input_path,
@@ -213,8 +260,8 @@ int idaapi uni_start_process(const char * /*path*/,
 //   msg("uni_start_process called\n");
    sk3wldbg *uc = (sk3wldbg*)dbg;
 
-   attach_action_to_menu("Debugger/Take memory snapshot", "sk3wldbg:mem_map", SETMENU_APP);
-   enable_menu_item("Debugger/Map memory...", false);
+   install_menu req(uc);
+   execute_sync(req, MFF_FAST);
    
    ea_t init_pc = get_screen_ea();
 
@@ -225,7 +272,17 @@ int idaapi uni_start_process(const char * /*path*/,
       return 0;
    }
 
+#ifdef DEBUG
+   ea_t ipc= (ea_t)uc->get_pc();
+   msg("Initial unicorn pc is: 0x%llx\n", (uint64_t)ipc);   
+#endif
+
+   qsem_free(uc->run_sem);
+   uc->run_sem = qsem_create(NULL, 0);
+   qmutex_unlock(uc->evt_mutex);
    uc->clear_memory();
+   uc->dbg_evt_list.clear();
+   uc->the_threads.clear();
 
    uc->getRandomBytes(&uc->the_process, 2);
    uc->the_process = (uc->the_process % 40000) + 1000;
@@ -260,7 +317,7 @@ int idaapi uni_start_process(const char * /*path*/,
                msg("fread fail\n");
             }
             else {
-               loaded = loadImage(uc, img, sz);
+               loaded = loadImage(uc, img, sz, args);
             }
             free(img);
          }
@@ -295,7 +352,7 @@ int idaapi uni_start_process(const char * /*path*/,
       //need a stack too, just sling it somewhere
       //add it to uc->memory
       unsigned int stack_top = 0xc0000000;
-      uc->map_mem_zero(stack_top - 0x100000, stack_top, UC_PROT_READ | UC_PROT_WRITE);
+      uc->map_mem_zero(stack_top - 0x100000, stack_top, UC_PROT_READ | UC_PROT_WRITE | UC_PROT_EXEC);
       stack_top -= 16;
       uc->set_sp(stack_top);
    }
@@ -305,6 +362,11 @@ int idaapi uni_start_process(const char * /*path*/,
 
    //need other ways to set PC, from start, user specified
    uc->set_pc(init_pc);
+
+#ifdef DEBUG
+   ipc = (ea_t)uc->get_pc();
+   msg("After set_pc, unicorn pc is: 0x%llx\n", (uint64_t)ipc);   
+#endif
 
    uc->emu_state = RS_RUN;
    //this is going to have to run in a separate thread otherwise other
@@ -1148,6 +1210,7 @@ sk3wldbg::sk3wldbg(const char *procname, uc_arch arch, uc_mode mode, const char 
    do_suspend = false;
    finished = false;
    single_step = false;
+   registered_menu = false;
    if (inf.mf) {
       debug_mode = (uc_mode)((int)UC_MODE_BIG_ENDIAN | (int)debug_mode);
    }
@@ -1258,6 +1321,9 @@ void sk3wldbg::close() {
 
    detach_action_from_menu("Debugger/Take memory snapshot", "sk3wldbg:mem_map");
 
+//   safe_msg req("sk3wldbg: closing unicorn instance\n");
+//   execute_sync(req, MFF_FAST);
+//   msg("sk3wldbg: closing unicorn instance\n");
    uc_close(uc);
 //   uc = NULL;
 }

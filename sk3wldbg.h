@@ -83,7 +83,7 @@ struct sk3wldbg : public debugger_t {
    bool do_suspend;
    bool finished;
    bool single_step;
-   uint64_t suspend_pc;
+   bool registered_menu;
    meminfo_vec_t memory;
    evt_list_t dbg_evt_list;
    qmutex_t evt_mutex;
