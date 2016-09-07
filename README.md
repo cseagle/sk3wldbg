@@ -26,15 +26,6 @@ The plugin is dependent on the Unicorn engine. Because IDA is 32-bit, you MUST
 have a 32-bit build of the Unicorn library for your IDA platform (Windows,
 Linux, OS X).
 
-The plugin is currently based on a patched branch of the Unicorn Engine, available
-here: https://github.com/cseagle/Unicorn/tree/ram_addr
-
-```
-git clone https://github.com/cseagle/Unicorn.git
-cd unicorn
-git checkout ram_addr
-```
-
 On all platforms you should clone sk3wldbg into your IDA SDK plugins directory so 
 that you end up with $IDASDKDIR/plugins/sk3wldbg because the build files all use
 relative paths to find the IDA header files.
@@ -84,8 +75,8 @@ For Linux users, make sure the 32-bit versions of these libraries are installed
 using your package manager. For OS X users, these libraries may be installed 
 with brew or macports. Windows users will need libglib-2.0-0.dll, libintl-8.dll,
 libgcc_s_dw2-1.dll, libwinpthread-1.dll, libiconv-2.dll, and any other required
-libraries from Mingw or cygwin installed into their IDA directory or in a system
-search path. To install using msys2/cygwin:
+libraries from the msys2 project installed into their IDA directory or in a system
+search path. To install using msys2:
 
 Msys2:
 
@@ -94,9 +85,9 @@ Msys2:
     $ pacman -S mingw-w64-i686-glib2
     $ pacman -S mingw-w64-i686-toolchain
 
-Cygwin:
-
-    $ apt-cyg install make gcc-core pkg-config libpcre-devel zlib-devel libglib2.0-devel
+It may also work with cygwin packages, but I have not found a way to do so. If you 
+attempt to do it with cygwin, remember that you will need the 32-bit version of 
+cygwin.
 
 ## USING THE PLUGIN
 
@@ -112,15 +103,15 @@ THE CURSOR AT THE INSTRUCTION WHERE YOU WANT EXECUTION TO BEGIN**. You should
 probably also set some breakpoints to make sure you gain control of the debugger
 at the earliest opportunity.
 
-The plugin contains very minimalist ELF (ELF64 is coming) and PE/PE32+ loaders to
+The plugin contains very minimalist ELF32/64 and PE/PE32+ loaders to
 load the file image into the Unicorn emulator instance. Outside of these formats
 the plugin simply copies the contents of your IDA sections into the emulator.
-you currently also get a stack and that's about it.
+You currently also get a stack and that's about it.
 
 ## THINGS THAT WORK (> 0% of the time)
 
 * Basic debugger operations such as step and run
-* Breakpoints are just implemented as a set against which the current program counter is compared. Software breakpoints (such as INT 3) are note used.
+* Breakpoints are just implemented as a set against which the current program counter is compared. Software breakpoints (such as INT 3) are not used.
 * IDA's "Take memory snapshot" feature works.
 
 ## THINGS THAT DON'T WORK (because they are not yet implemented)
