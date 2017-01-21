@@ -13,7 +13,7 @@
 
 // These are masks of supported modes for each cpu/arch.
 // They should be updated when changes are made to the uc_mode enum typedef.
-#define UC_MODE_ARM_MASK    (UC_MODE_ARM|UC_MODE_THUMB|UC_MODE_LITTLE_ENDIAN)
+#define UC_MODE_ARM_MASK    (UC_MODE_ARM|UC_MODE_THUMB|UC_MODE_LITTLE_ENDIAN|UC_MODE_MCLASS)
 #define UC_MODE_MIPS_MASK   (UC_MODE_MIPS32|UC_MODE_MIPS64|UC_MODE_LITTLE_ENDIAN|UC_MODE_BIG_ENDIAN)
 #define UC_MODE_X86_MASK    (UC_MODE_16|UC_MODE_32|UC_MODE_64|UC_MODE_LITTLE_ENDIAN)
 #define UC_MODE_PPC_MASK    (UC_MODE_PPC64|UC_MODE_BIG_ENDIAN)
@@ -27,13 +27,11 @@
 #define READ_WORD(x) (x & 0xffff)
 #define READ_BYTE_H(x) ((x & 0xffff) >> 8)
 #define READ_BYTE_L(x) (x & 0xff)
-#define WRITE_DWORD(x, w) (x = (x & ~0xffffffff) | (w & 0xffffffff))
+#define WRITE_DWORD(x, w) (x = (x & ~0xffffffffLL) | (w & 0xffffffff))
 #define WRITE_WORD(x, w) (x = (x & ~0xffff) | (w & 0xffff))
 #define WRITE_BYTE_H(x, b) (x = (x & ~0xff00) | ((b & 0xff) << 8))
 #define WRITE_BYTE_L(x, b) (x = (x & ~0xff) | (b & 0xff))
 
-
-QTAILQ_HEAD(CPUTailQ, CPUState);
 
 typedef struct ModuleEntry {
     void (*init)(void);
@@ -107,6 +105,7 @@ enum uc_hook_idx {
     UC_HOOK_MEM_READ_IDX,
     UC_HOOK_MEM_WRITE_IDX,
     UC_HOOK_MEM_FETCH_IDX,
+    UC_HOOK_MEM_READ_AFTER_IDX,
 
     UC_HOOK_MAX,
 };
@@ -145,10 +144,6 @@ static inline bool _hook_exists_bounded(struct list_item *cur, uint64_t addr)
 struct uc_struct {
     uc_arch arch;
     uc_mode mode;
-    QemuMutex qemu_global_mutex; // qemu/cpus.c
-    QemuCond qemu_cpu_cond; // qemu/cpus.c
-    QemuCond *tcg_halt_cond; // qemu/cpus.c
-    struct CPUTailQ cpus;   // qemu/cpu-exec.c
     uc_err errnum;  // qemu/cpu-exec.c
     AddressSpace as;
     query_t query;
@@ -171,8 +166,8 @@ struct uc_struct {
     uc_mem_unmap_t memory_unmap;
     uc_readonly_mem_t readonly_mem;
     uc_mem_redirect_t mem_redirect;
-    // list of cpu
-    void* cpu;
+    // TODO: remove current_cpu, as it's a flag for something else ("cpu running"?)
+    CPUState *cpu, *current_cpu;
 
     MemoryRegion *system_memory;    // qemu/exec.c
     MemoryRegion io_mem_rom;    // qemu/exec.c
@@ -180,10 +175,8 @@ struct uc_struct {
     MemoryRegion io_mem_unassigned; // qemu/exec.c
     MemoryRegion io_mem_watch;  // qemu/exec.c
     RAMList ram_list;   // qemu/exec.c
-    CPUState *next_cpu; // qemu/cpus.c
     BounceBuffer bounce;    // qemu/cpu-exec.c
     volatile sig_atomic_t exit_request; // qemu/cpu-exec.c
-    spinlock_t x86_global_cpu_lock; // for X86 arch only
     bool global_dirty_log;  // qemu/memory.c
     /* This is a multi-level map on the virtual address space.
        The bottom level has pointers to PageDesc.  */
@@ -195,7 +188,6 @@ struct uc_struct {
     unsigned memory_region_transaction_depth;
     bool memory_region_update_pending;
     bool ioeventfd_update_pending;
-    QemuMutex flat_view_mutex;
     QTAILQ_HEAD(memory_listeners, MemoryListener) memory_listeners;
     QTAILQ_HEAD(, AddressSpace) address_spaces;
     MachineState *machine_state;
@@ -212,7 +204,6 @@ struct uc_struct {
     int apic_no;
     bool mmio_registered;
     bool apic_report_tpr_access;
-    CPUState *current_cpu;
 
     // linked lists containing hooks per type
     struct list hook[UC_HOOK_MAX];
@@ -250,7 +241,11 @@ struct uc_struct {
     uint64_t next_pc;   // save next PC for some special cases
 };
 
-#include "qemu_macro.h"
+// Metadata stub for the variable-size cpu context used with uc_context_*()
+struct uc_context {
+   size_t size;
+   char data[0];
+};
 
 // check if this address is mapped in (via uc_mem_map())
 MemoryRegion *memory_mapping(struct uc_struct* uc, uint64_t address);
