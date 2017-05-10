@@ -121,10 +121,11 @@ bool loadPE64(sk3wldbg *uc, void *img, size_t /*sz*/, const char * /*args*/) {
       unsigned int perms = (*(unsigned int*)(sections + 36)) >> 29;
       unsigned int file_off = *(unsigned int*)(sections + 20);
       unsigned int filesz = *(unsigned int*)(sections + 16);
-      uc->map_mem_zero(vaddr & ~0xfff, (vaddr + vsize + 0xfff) & ~0xfff, ida_to_uc_perms_map_win[perms]);
+      void *buf = uc->map_mem_zero(vaddr, vaddr + vsize, ida_to_uc_perms_map_win[perms]);
       if (filesz) {
          msg("Copying bytes 0x%x:0x%x into block\n", file_off, file_off + filesz);
-         uc_err err = uc_mem_write(uc->uc, vaddr, file_off + (char*)img, filesz);
+         memcpy(buf, file_off + (char*)img, filesz);
+//         uc_err err = uc_mem_write(uc->uc, vaddr, file_off + (char*)img, filesz);
       }
       sections += 40;
    }
@@ -159,10 +160,11 @@ bool loadPE32(sk3wldbg *uc, void *img, size_t /*sz*/, const char * /*args*/) {
       unsigned int perms = (*(unsigned int*)(sections + 36)) >> 29;
       unsigned int file_off = *(unsigned int*)(sections + 20);
       unsigned int filesz = *(unsigned int*)(sections + 16);
-      uc->map_mem_zero(vaddr & ~0xfff, (vaddr + vsize + 0xfff) & ~0xfff, ida_to_uc_perms_map_win[perms]);
+      void *block = uc->map_mem_zero(vaddr, vaddr + vsize, ida_to_uc_perms_map_win[perms]);
       if (filesz) {
          msg("Copying bytes 0x%x:0x%x into block\n", file_off, file_off + filesz);
-         uc_err err = uc_mem_write(uc->uc, vaddr, file_off + (char*)img, filesz);
+         memcpy(block, file_off + (char*)img, filesz);
+//         uc_err err = uc_mem_write(uc->uc, vaddr, file_off + (char*)img, filesz);
       }
       sections += 40;
    }
@@ -361,22 +363,26 @@ bool loadElf64(sk3wldbg *uc, void *img, uint64_t sz, const char *args) {
          uint64_t p_memsz = get_elf_64(&phdr->p_memsz, big_endian);
          uint64_t p_offset = get_elf_64(&phdr->p_offset, big_endian);
          uint64_t p_filesz = get_elf_64(&phdr->p_filesz, big_endian);
-
+/*
          uint64_t begin = p_vaddr & ~0xfff;
          uint64_t end = (p_vaddr + p_memsz + 0xfff) & ~0xfff;
+*/
          msg("ELF64 loader mapping 0x%llx bytes at 0x%llx, from file offset 0x%llx\n", 
                (uint64_t)p_memsz, (uint64_t)p_vaddr, (uint64_t)p_offset);
-         uc->map_mem_zero(begin, end, ida_to_uc_perms_map[p_flags & 7]);
+         void *block = uc->map_mem_zero(p_vaddr & ~0xfff, p_vaddr + p_memsz, ida_to_uc_perms_map[p_flags & 7]);
          uint64_t offset = p_offset & ~0xfff;
          uint64_t endoff = (p_offset + p_filesz + 0xfff) & ~0xfff;
          if (endoff > sz) {
             endoff = p_offset + p_filesz;
          }
          msg("Copying bytes 0x%llx:0x%llx into block\n", (uint64_t)offset, (uint64_t)endoff);
+         memcpy(block, offset + (char*)img, (size_t)(endoff - offset));
+/*
          uc_err err = uc_mem_write(uc->uc, begin, offset + (char*)img, (size_t)(endoff - offset));
          if (err != UC_ERR_OK) {
             msg("uc_mem_write failed with error: %d\n", err);
          }
+*/
       }
       else if (p_type == PT_GNU_STACK) {
          if ((p_flags & PF_X) == 0) {
@@ -429,17 +435,20 @@ bool loadElf32(sk3wldbg *uc, void *img, size_t sz, const char *args) {
          ea_t begin = p_vaddr & ~0xfff;
          ea_t end = (p_vaddr + p_memsz + 0xfff) & ~0xfff;
          msg("ELF32 loader mapping 0x%x bytes at 0x%x, from file offset 0x%x\n", p_memsz, p_vaddr, p_offset);
-         uc->map_mem_zero(begin, end, ida_to_uc_perms_map[p_flags & 7]);
+         void *block = uc->map_mem_zero(begin, end, ida_to_uc_perms_map[p_flags & 7]);
          size_t offset = p_offset & ~0xfff;
          size_t endoff = (p_offset + p_filesz + 0xfff) & ~0xfff;
          if (endoff > sz) {
             endoff = p_offset + p_filesz;
          }
          msg("Copying bytes 0x%llx:0x%llx into block\n", (uint64_t)offset, (uint64_t)endoff);
+         memcpy(block, offset + (char*)img, endoff - offset);
+/*
          uc_err err = uc_mem_write(uc->uc, begin, offset + (char*)img, endoff - offset);
          if (err != UC_ERR_OK) {
             msg("uc_mem_write failed with error: %d\n", err);
          }
+*/
       }
       else if (p_type == PT_GNU_STACK) {
          if ((p_flags & PF_X) == 0) {

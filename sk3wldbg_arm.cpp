@@ -137,9 +137,11 @@ sk3wldbg_arm::sk3wldbg_arm() : sk3wldbg("ARM", UC_ARCH_ARM, UC_MODE_ARM) {
 }
 
 void sk3wldbg_arm::check_mode(ea_t addr) {
-   sel_t thumb = get_segreg(addr, 20);   //20 is ARM T reg
-   if (thumb) {
+   sel_t treg = get_segreg(addr, 20);   //20 is ARM T reg
+   if (treg) {
       debug_mode = (uc_mode)((int)UC_MODE_THUMB | (int)debug_mode);
+//      msg("Enabling thumb mode\n");
+      thumb = 1;
    }
 }
 

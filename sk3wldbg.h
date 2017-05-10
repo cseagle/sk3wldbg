@@ -40,9 +40,11 @@
 #include <idd.hpp>
 #include <kernwin.hpp>
 
+#include <vector>
 #include <set>
 
 using std::set;
+using std::vector;
 
 #ifndef PLUGIN_NAME
 #define PLUGIN_NAME "sk3wldbg"
@@ -58,6 +60,7 @@ enum run_state {
    RS_STEP_INTO,
    RS_STEP_OUT,
    RS_PAUSE,
+   RS_BREAK,
    RS_TERM
 };
 
@@ -69,11 +72,14 @@ struct sk3wldbg : public debugger_t {
    int hProv;
 #endif
 
+   uint32_t thumb;
    uint32_t the_process;
    
    thread_list the_threads;
 
    set<uint64_t> breakpoints;
+   set<uint64_t> tbreaks;
+   vector<void*> memmap;
 
    uc_arch debug_arch;
    uc_mode debug_mode;
@@ -89,6 +95,7 @@ struct sk3wldbg : public debugger_t {
    qmutex_t evt_mutex;
    qsemaphore_t run_sem;
    run_state emu_state;
+   run_state resume_mode;
    qthread_t process_thread;
    regval_t *saved;
    
@@ -105,9 +112,14 @@ struct sk3wldbg : public debugger_t {
    virtual void install_initial_hooks();
    virtual void check_mode(ea_t addr) {};
    
+   void queue_step_event(uint64_t _pc);
    void enqueue_debug_evt(debug_event_t &evt);
    bool dequeue_debug_evt(debug_event_t *out);
    size_t debug_queue_len() {return dbg_evt_list.size();}
+   
+   bool is_stepping() {return single_step;}
+   void clear_stepping() {single_step = false;}
+   void set_stepping() {single_step = true;}
 
    void runtime_exception(uc_err err, uint64_t pc);
    bool queue_exception_event(uint32_t code, uint64_t mem_addr, const char *msg);
@@ -117,10 +129,9 @@ struct sk3wldbg : public debugger_t {
    void start(uint64_t initial_pc);
    void pause();
    void resume();
-   void step(uint64_t initial_pc);
    bool open();
    void clear_memory() {memory.clear();}
-   void map_mem_zero(uint64_t startAddr, uint64_t endAddr, unsigned int perms);
+   void *map_mem_zero(uint64_t startAddr, uint64_t endAddr, unsigned int perms);
    void map_mem_copy(uint64_t startAddr, uint64_t endAddr, unsigned int perms, void *src);
    void getRandomBytes(void *buf, unsigned int len);
 
@@ -142,6 +153,9 @@ struct sk3wldbg : public debugger_t {
    bool set_pc(uint64_t);
    uint64_t get_sp();
    bool set_sp(uint64_t);
+
+   run_state get_state();
+   void set_state(run_state new_state);
 };
 
 struct mem_map_action_handler : public action_handler_t {
