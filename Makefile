@@ -1,6 +1,8 @@
 #Set this variable to point to your SDK directory
 IDA_SDK=../../
 
+SDKVER=$(shell pwd | grep -o -E "idasdk[0-9]{2,3}" | cut -c 7- | sed 's/\(.\)\(.\)/\1\.\2/')
+
 PLATFORM=$(shell uname | cut -f 1 -d _)
 BIN=$(shell which idaq 2>/dev/null)
 ifeq ($(strip $(BIN)),)
@@ -34,8 +36,8 @@ PLUGIN_EXT32=.plw
 PLUGIN_EXT64=.p64
 
 else ifeq "$(PLATFORM)" "Linux"
-BIN=$(shell find /opt -name idaq | tail -n 1)
-IDA=$(dir $(BIN))
+IDA=/opt/ida-$(SDKVER)
+HAVE_IDA64=$(shell if [ -f $(IDA)/libida64.so ]; then echo -n yes; fi)
 PLATFORM_CFLAGS=-D__LINUX__
 PLATFORM_LDFLAGS=-shared -s
 IDADIR=-L$(IDA)
@@ -46,7 +48,9 @@ IDALIB32=-lida
 IDALIB64=-lida64
 
 else ifeq "$(PLATFORM)" "Darwin"
-IDA=$(shell dirname "`find /Applications -name idaq | tail -n 1`")
+IDAHOME=/Applications/IDA Pro $(SDKVER)
+IDA=$(shell dirname "`find "$(IDAHOME)" -name idaq | tail -n 1`")
+HAVE_IDA64=$(shell find "$(IDA)" -name libida64.dylib -exec echo -n yes \;)
 PLATFORM_CFLAGS=-D__MAC__
 PLATFORM_LDFLAGS=-dynamiclib
 IDADIR=-L"$(IDA)"
@@ -127,5 +131,5 @@ endif
 
 #change sk3wldbg below to the name of your plugin, make sure to add any 
 #additional files that your plugin is dependent on
-sk3wldbg.o: sk3wldbg.cpp
+#sk3wldbg.o: sk3wldbg.cpp
 
