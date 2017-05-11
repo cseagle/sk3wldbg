@@ -26,6 +26,11 @@ The plugin is dependent on the Unicorn engine. Because IDA is 32-bit, you MUST
 have a 32-bit build of the Unicorn library for your IDA platform (Windows,
 Linux, OS X).
 
+* If building Unicorn for Linux use: ./make.sh linux32
+* If building Unicorn for OS X use: ./make.sh macos-universal
+* If cross compiling for Windows: ./make.sh cross-win32
+* Newer versions of Unicorn can also be built on Windows using Visual Studio
+
 On all platforms you should clone sk3wldbg into your IDA SDK plugins directory so 
 that you end up with $IDASDKDIR/plugins/sk3wldbg because the build files all use
 relative paths to find the IDA header files.
@@ -45,11 +50,15 @@ headers, make sure you update the Visual Studio project settings.
 Copy the plugins into your <IDADIR>/plugins directory and Sk3wlDbg will be
 listed as an available debugger for all architectures supported by Unicorn.
 
+Note that the unicorn dll needs to be found in your PATH or copied into your
+IDA installation directory.
+
 ### Linux / OS X:
 
 Use the include Makefile to build the plugin. You may need to adjust the paths
-that get searched to find your IDA installation ("/Applications/IDA Pro 6.9" is
-assume on OSX and /opt/ida-6.9 is assumed on Linux). This is required to
+that get searched to find your IDA installation ("/Applications/IDA Pro N.NN" is
+assumed on OSX and /opt/ida-N.NN is assumed on Linux, were N.NN is derived from
+the name of your IDA SDK directory eg idasdk695). This is required to
 successfully link the plugin. Note that the Makefile assumes that the Unicorn
 library headers have been copied into the sk3wldbg directory alongside the
 plugin source files (this is already done in the git repo). If you want to
@@ -61,33 +70,15 @@ Assuming you have installed IDA to $IDADIR, install the plugin by copying the
 compiled binaries from $IDASDKDIR/bin/plugins to $IDADIR/plugins (Linux/Windows)
 or $IDADIR/idabin/plugins (OS X). Windows users should install the 32-bit Unicorn
 dll into $IDADIR as Unicorn1.dll. Linux and OS X users should make sure they
-have install the 32-bit Unicorn shared library into an appropriate location on
+have installed the 32-bit Unicorn shared library into an appropriate location on
 their respective systems (/usr/local/lib works). This should already be taken
 care of if you build Unicorn from source.
 
 ### Pre-built binaries:
 
 As an alternative to building the plugin yourself, pre-built binaries for 
-IDA 6.9 (Windows, Linux, OS X), including 32-bit versions of the Unicorn 
-library are available in the bin directory. Install these per the instructions
-above. Pleasae note that the Unicorn library depends on glib-2.0 and libintl.
-For Linux users, make sure the 32-bit versions of these libraries are installed 
-using your package manager. For OS X users, these libraries may be installed 
-with brew or macports. Windows users will need libglib-2.0-0.dll, libintl-8.dll,
-libgcc_s_dw2-1.dll, libwinpthread-1.dll, libiconv-2.dll, and any other required
-libraries from the msys2 project installed into their IDA directory or in a system
-search path. To install using msys2:
-
-Msys2:
-
-    $ pacman -S make
-    $ pacman -S pkg-config
-    $ pacman -S mingw-w64-i686-glib2
-    $ pacman -S mingw-w64-i686-toolchain
-
-It may also work with cygwin packages, but I have not found a way to do so. If you 
-attempt to do it with cygwin, remember that you will need the 32-bit version of 
-cygwin.
+IDA 6.95 (Windows, Linux, OS X) are available in the bin directory.
+Make sure that you have a suitable 32 bit Unicorn installed for your platform.
 
 ## USING THE PLUGIN
 
@@ -101,7 +92,7 @@ No options are currently recognized by the plugin. When you launch the debugger
 execution will begin at the current IDA cursor location. **MAKE SURE YOU POSITION
 THE CURSOR AT THE INSTRUCTION WHERE YOU WANT EXECUTION TO BEGIN**. You should 
 probably also set some breakpoints to make sure you gain control of the debugger
-at the earliest opportunity.
+at some point.
 
 The plugin contains very minimalist ELF32/64 and PE/PE32+ loaders to
 load the file image into the Unicorn emulator instance. Outside of these formats
@@ -113,10 +104,10 @@ You currently also get a stack and that's about it.
 * Basic debugger operations such as step and run
 * Breakpoints are just implemented as a set against which the current program counter is compared. Software breakpoints (such as INT 3) are not used.
 * IDA's "Take memory snapshot" feature works.
+* Conditional breakpoints handled by IDA
 
 ## THINGS THAT DON'T WORK (because they are not yet implemented)
 
-* Conditional breakpoints
 * IDA Appcalls
 * Exception handling (as in the debugger catching exception that happen in the emulated code like out of bounds memory accesses or illegal instructions)
 * Tracing
