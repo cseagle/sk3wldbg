@@ -28,7 +28,12 @@
 #define USE_DANGEROUS_FUNCTIONS
 
 #ifdef __NT__
+#ifdef _WIN32
+#ifndef _MSC_VER
 #include <windows.h>
+#endif
+#include <winsock2.h>
+#endif
 #include <winnt.h>
 #include <wincrypt.h>
 #else

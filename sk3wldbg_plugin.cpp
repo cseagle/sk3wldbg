@@ -30,6 +30,8 @@
 #undef PACKED
 #endif
 
+#define USE_DANGEROUS_FUNCTIONS
+
 #include <unicorn/unicorn.h>
 
 #include <ida.hpp>

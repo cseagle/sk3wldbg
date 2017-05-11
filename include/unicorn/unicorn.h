@@ -8,17 +8,9 @@
 extern "C" {
 #endif
 
-#include <stdint.h>
-#ifdef _MSC_VER
-#ifndef __cplusplus
-typedef unsigned char bool;
-#define false 0
-#define true 1
-#endif
-#else
-#include <stdbool.h>
-#endif
+#include "platform.h"
 #include <stdarg.h>
+
 #if defined(UNICORN_HAS_OSXKERNEL)
 #include <libkern/libkern.h>
 #else
@@ -37,6 +29,12 @@ typedef size_t uc_hook;
 #include "arm64.h"
 #include "mips.h"
 #include "sparc.h"
+
+#ifdef __GNUC__
+#define DEFAULT_VISIBILITY __attribute__((visibility("default")))
+#else
+#define DEFAULT_VISIBILITY
+#endif
 
 #ifdef _MSC_VER
 #pragma warning(disable:4201)
@@ -70,7 +68,7 @@ typedef size_t uc_hook;
 // Unicorn package version
 #define UC_VERSION_MAJOR UC_API_MAJOR
 #define UC_VERSION_MINOR UC_API_MINOR
-#define UC_VERSION_EXTRA 0
+#define UC_VERSION_EXTRA 2
 
 
 /*
@@ -208,7 +206,7 @@ typedef enum uc_mem_type {
 typedef enum uc_hook_type {
     // Hook all interrupt/syscall events
     UC_HOOK_INTR = 1 << 0,
-    // Hook a particular instruction
+    // Hook a particular instruction - only a very small subset of instructions supported here
     UC_HOOK_INSN = 1 << 1,
     // Hook a range of code
     UC_HOOK_CODE = 1 << 2,
@@ -275,6 +273,14 @@ typedef void (*uc_cb_hookmem_t)(uc_engine *uc, uc_mem_type type,
   @user_data: user data passed to tracing APIs
 
   @return: return true to continue, or false to stop program (due to invalid memory).
+           NOTE: returning true to continue execution will only work if if the accessed
+           memory is made accessible with the correct permissions during the hook.
+           In the event of a UC_MEM_READ_UNMAPPED or UC_MEM_WRITE_UNMAPPED callback,
+           the memory should be uc_mem_map()-ed with the correct permissions, and the
+           instruction will then read or write to the address as it was supposed to.
+           In the event of a UC_MEM_FETCH_UNMAPPED callback, the memory can be mapped
+           in as executable, in which case execution will resume from the fetched address,
+           or the instruction pointer can be written to in order to resume execution elsewhere.
 */
 typedef bool (*uc_cb_eventmem_t)(uc_engine *uc, uc_mem_type type,
         uint64_t address, int size, int64_t value, void *user_data);
@@ -346,11 +352,12 @@ UNICORN_EXPORT
 uc_err uc_open(uc_arch arch, uc_mode mode, uc_engine **uc);
 
 /*
- Close UC instance: MUST do to release the handle when it is not used anymore.
- NOTE: this must be called only when there is no longer usage of Unicorn.
- The reason is the this API releases some cached memory, thus access to any
- Unicorn API after uc_close() might crash your application.
- After this, @uc is invalid, and nolonger usable.
+ Close a Unicorn engine instance.
+ NOTE: this must be called only when there is no longer any
+ usage of @uc. This API releases some of @uc's cached memory, thus
+ any use of the Unicorn API with @uc after it has been closed may
+ crash your application. After this, @uc is invalid, and is no
+ longer usable.
 
  @uc: pointer to a handle returned by uc_open()
 

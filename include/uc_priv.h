@@ -4,7 +4,7 @@
 #ifndef UC_PRIV_H
 #define UC_PRIV_H
 
-#include <stdint.h>
+#include "unicorn/platform.h"
 #include <stdio.h>
 
 #include "qemu.h"
@@ -13,7 +13,7 @@
 
 // These are masks of supported modes for each cpu/arch.
 // They should be updated when changes are made to the uc_mode enum typedef.
-#define UC_MODE_ARM_MASK    (UC_MODE_ARM|UC_MODE_THUMB|UC_MODE_LITTLE_ENDIAN|UC_MODE_MCLASS)
+#define UC_MODE_ARM_MASK    (UC_MODE_ARM|UC_MODE_THUMB|UC_MODE_LITTLE_ENDIAN|UC_MODE_MCLASS|UC_MODE_BIG_ENDIAN)
 #define UC_MODE_MIPS_MASK   (UC_MODE_MIPS32|UC_MODE_MIPS64|UC_MODE_LITTLE_ENDIAN|UC_MODE_BIG_ENDIAN)
 #define UC_MODE_X86_MASK    (UC_MODE_16|UC_MODE_32|UC_MODE_64|UC_MODE_LITTLE_ENDIAN)
 #define UC_MODE_PPC_MASK    (UC_MODE_PPC64|UC_MODE_BIG_ENDIAN)
@@ -59,8 +59,6 @@ typedef void (*uc_args_uc_t)(struct uc_struct*);
 typedef int (*uc_args_int_uc_t)(struct uc_struct*);
 
 typedef bool (*uc_args_tcg_enable_t)(struct uc_struct*);
-
-typedef void (*uc_minit_t)(struct uc_struct*, ram_addr_t);
 
 typedef void (*uc_args_uc_long_t)(struct uc_struct*, unsigned long);
 
@@ -110,9 +108,11 @@ enum uc_hook_idx {
     UC_HOOK_MAX,
 };
 
+#define HOOK_FOREACH_VAR_DECLARE                          \
+    struct list_item *cur
+
 // for loop macro to loop over hook lists
 #define HOOK_FOREACH(uc, hh, idx)                         \
-    struct list_item *cur;                                \
     for (                                                 \
         cur = (uc)->hook[idx##_IDX].head;                 \
         cur != NULL && ((hh) = (struct hook *)cur->data)  \
@@ -251,3 +251,4 @@ struct uc_context {
 MemoryRegion *memory_mapping(struct uc_struct* uc, uint64_t address);
 
 #endif
+/* vim: set ts=4 noet:  */

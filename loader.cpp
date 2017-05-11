@@ -17,10 +17,10 @@
    Place, Suite 330, Boston, MA 02111-1307 USA
 */
 
+#include "loader.h"
 #include <ida.hpp>
 #include <llong.hpp>
 #include <nalt.hpp>
-#include "loader.h"
 
 struct ELF32_Ehdr {
    uint8_t  e_ident[16];
