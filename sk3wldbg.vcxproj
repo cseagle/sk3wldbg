@@ -159,7 +159,7 @@
       </DataExecutionPrevention>
       <ImportLibrary>.\Debug/sk3wldbg.lib</ImportLibrary>
       <TargetMachine>MachineX86</TargetMachine>
-      <GenerateDebugInformation>false</GenerateDebugInformation>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
     <Bscmake>
       <SuppressStartupBanner>true</SuppressStartupBanner>
@@ -216,6 +216,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="loader.cpp" />
+    <ClCompile Include="mem_mgr.cpp" />
     <ClCompile Include="sk3wldbg.cpp" />
     <ClCompile Include="sk3wldbg_arm.cpp" />
     <ClCompile Include="sk3wldbg_m68k.cpp" />
@@ -227,6 +228,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="loader.h" />
+    <ClInclude Include="mem_mgr.h" />
     <ClInclude Include="sk3wldbg.h" />
     <ClInclude Include="sk3wldbg_arm.h" />
     <ClInclude Include="sk3wldbg_m68k.h" />

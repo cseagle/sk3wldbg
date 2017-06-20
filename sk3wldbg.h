@@ -52,6 +52,8 @@
 #include <vector>
 #include <set>
 
+#include "mem_mgr.h"
+
 using std::set;
 using std::vector;
 
@@ -89,12 +91,14 @@ struct sk3wldbg : public debugger_t {
    set<uint64_t> breakpoints;
    set<uint64_t> tbreaks;
    vector<void*> memmap;
+   mem_mgr *memmgr;
 
    uc_arch debug_arch;
    uc_mode debug_mode;
    qstring cpu_model;
 
    uc_engine *uc;
+   uc_context *ctx;  //somtimes we need to save/restore state
    bool do_suspend;
    bool finished;
    bool single_step;
@@ -119,6 +123,8 @@ struct sk3wldbg : public debugger_t {
    ~sk3wldbg();   
    
    virtual void install_initial_hooks();
+   virtual bool is_system_call(uint8_t *inst, uint32_t size) {return false;};
+   virtual void handle_system_call(uint8_t *inst, uint32_t size) {};
    virtual void check_mode(ea_t addr) {};
    
    void queue_step_event(uint64_t _pc);
@@ -140,6 +146,7 @@ struct sk3wldbg : public debugger_t {
    void resume();
    bool open();
    void clear_memory() {memory.clear();}
+   void init_memmgr(uint64_t map_min, uint64_t map_max);
    void *map_mem_zero(uint64_t startAddr, uint64_t endAddr, unsigned int perms);
    void map_mem_copy(uint64_t startAddr, uint64_t endAddr, unsigned int perms, void *src);
    void getRandomBytes(void *buf, unsigned int len);

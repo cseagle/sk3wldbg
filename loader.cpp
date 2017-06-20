@@ -22,7 +22,7 @@
 #include <llong.hpp>
 #include <nalt.hpp>
 
-struct ELF32_Ehdr {
+struct Elf32_Ehdr {
    uint8_t  e_ident[16];
 #define ELF_IDENT  "\177ELF\x01\x01\x01"
 #define EI_DATA 5           // endian-ness   1 == little-endian, 2 == big-endian
@@ -41,7 +41,7 @@ struct ELF32_Ehdr {
    uint16_t e_shstrndx;     /* sect header # of str table */
 };
 
-struct ELF32_Phdr {
+struct Elf32_Phdr {
    uint32_t        p_type;         /* Section type */
 
 #define PT_LOAD      1
@@ -111,6 +111,7 @@ bool loadPE64(sk3wldbg *uc, void *img, size_t /*sz*/, const char * /*args*/) {
       msg("bad PE signature\n");
       return false;
    }
+   uc->init_memmgr(0x130000 - 0x100000, 0x80000000);
    unsigned int nsect = *(unsigned short*)(pe + 6);
    unsigned int ohdr = *(unsigned short*)(pe + 20);
    ea_t image_base = *(ea_t*)(pe + 24 + 24);
@@ -150,6 +151,7 @@ bool loadPE32(sk3wldbg *uc, void *img, size_t /*sz*/, const char * /*args*/) {
       msg("bad PE signature\n");
       return false;
    }
+   uc->init_memmgr(0x130000 - 0x100000, 0x80000000);
    unsigned int nsect = *(unsigned short*)(pe + 6);
    unsigned int ohdr = *(unsigned short*)(pe + 20);
    unsigned int image_base = *(unsigned int*)(pe + 24 + 28);
@@ -353,7 +355,28 @@ bool loadElf64(sk3wldbg *uc, void *img, uint64_t sz, const char *args) {
       return false;
    }
    Elf64_Phdr *phdr = (Elf64_Phdr*)(e_phoff + (char*)img);
+   Elf64_Phdr *h = phdr;
    uint16_t e_phnum = get_elf_16(&elf->e_phnum, big_endian);
+
+   //check for execstack so we can map the stack first
+   for (uint16_t i = 0; i < e_phnum; i++, h++) {
+      uint32_t p_type = get_elf_32(&h->p_type, big_endian);
+      uint32_t p_flags = get_elf_32(&h->p_flags, big_endian);
+      if (p_type == PT_GNU_STACK) {
+         if ((p_flags & PF_X) == 0) {
+            //stack marked NX
+            exec_stack = 0;
+         }
+      }
+   }
+   //ELF stack
+   uint64_t stack_top = 0x7ffffffff000ll;
+   uc->init_memmgr(0x1000, stack_top);
+   uc->map_mem_zero(stack_top - 0x100000, stack_top, UC_PROT_READ | UC_PROT_WRITE | exec_stack);
+
+   stack_top = create_elf_env(uc, stack_top, args, true, big_endian);
+   uc->set_sp(stack_top);
+
    for (uint16_t i = 0; i < e_phnum; i++) {
       uint32_t p_type = get_elf_32(&phdr->p_type, big_endian);
       uint32_t p_flags = get_elf_32(&phdr->p_flags, big_endian);
@@ -384,27 +407,14 @@ bool loadElf64(sk3wldbg *uc, void *img, uint64_t sz, const char *args) {
          }
 */
       }
-      else if (p_type == PT_GNU_STACK) {
-         if ((p_flags & PF_X) == 0) {
-            //stack marked NX
-            exec_stack = 0;
-         }
-      }
       phdr++;
    }
-
-   //ELF stack
-   uint64_t stack_top = 0x7ffffffff000ll;
-   uc->map_mem_zero(stack_top - 0x100000, stack_top, UC_PROT_READ | UC_PROT_WRITE | exec_stack);
-
-   stack_top = create_elf_env(uc, stack_top, args, true, big_endian);
-   uc->set_sp(stack_top);
 
    return true;
 }
 
 bool loadElf32(sk3wldbg *uc, void *img, size_t sz, const char *args) {
-   ELF32_Ehdr *elf = (ELF32_Ehdr*)img;
+   Elf32_Ehdr *elf = (Elf32_Ehdr*)img;
    uint32_t exec_stack = UC_PROT_EXEC;
    bool big_endian = false;
 
@@ -416,12 +426,33 @@ bool loadElf32(sk3wldbg *uc, void *img, size_t sz, const char *args) {
       big_endian = true;
    }
    uint32_t e_phoff = get_elf_32(&elf->e_phoff, big_endian);
-   if (e_phoff > (sz - sizeof(ELF32_Phdr))) {
+   if (e_phoff > (sz - sizeof(Elf32_Phdr))) {
       msg("bad e_phoff\n");
       return false;
    }
-   ELF32_Phdr *phdr = (ELF32_Phdr*)(e_phoff + (char*)img);
+   Elf32_Phdr *phdr = (Elf32_Phdr*)(e_phoff + (char*)img);
+   Elf32_Phdr *h = phdr;
    uint16_t e_phnum = get_elf_16(&elf->e_phnum, big_endian);
+
+   //check for execstack so we can map the stack first
+   for (uint16_t i = 0; i < e_phnum; i++, h++) {
+      uint32_t p_type = get_elf_32(&h->p_type, big_endian);
+      uint32_t p_flags = get_elf_32(&h->p_flags, big_endian);
+      if (p_type == PT_GNU_STACK) {
+         if ((p_flags & PF_X) == 0) {
+            //stack marked NX
+            exec_stack = 0;
+         }
+      }
+   }
+   //ELF stack
+   uint32_t stack_top = 0xffffe000;
+   uc->init_memmgr(0x1000, stack_top);
+   uc->map_mem_zero(stack_top - 0x100000, stack_top, UC_PROT_READ | UC_PROT_WRITE | exec_stack);
+
+   stack_top = (uint32_t)create_elf_env(uc, stack_top, args, false, big_endian);
+   uc->set_sp(stack_top);
+
    for (uint16_t i = 0; i < e_phnum; i++) {
       uint32_t p_type = get_elf_32(&phdr->p_type, big_endian);
       uint32_t p_flags = get_elf_32(&phdr->p_flags, big_endian);
@@ -450,21 +481,8 @@ bool loadElf32(sk3wldbg *uc, void *img, size_t sz, const char *args) {
          }
 */
       }
-      else if (p_type == PT_GNU_STACK) {
-         if ((p_flags & PF_X) == 0) {
-            //stack marked NX
-            exec_stack = 0;
-         }
-      }
       phdr++;
    }
-
-   //ELF stack
-   uint32_t stack_top = 0xC0000000;
-   uc->map_mem_zero(stack_top - 0x100000, stack_top, UC_PROT_READ | UC_PROT_WRITE | exec_stack);
-
-   stack_top = (uint32_t)create_elf_env(uc, stack_top, args, false, big_endian);
-   uc->set_sp(stack_top);
 
    return true;
 }

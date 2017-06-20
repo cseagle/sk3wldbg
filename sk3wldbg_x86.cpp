@@ -20,6 +20,22 @@
 #include "sk3wldbg_x86.h"
 #include <unicorn/x86.h>
 
+#define LINUX_X86_EXIT       1
+#define LINUX_X86_FORK       2
+#define LINUX_X86_READ       3
+#define LINUX_X86_WRITE      4
+#define LINUX_X86_OPEN       5
+#define LINUX_X86_CLOSE      6
+#define LINUX_X86_PTRACE     26
+#define LINUX_X86_ALARM      27
+#define LINUX_X86_BRK        42
+#define LINUX_X86_SIGNAL     48
+#define LINUX_X86_MMAP       90
+#define LINUX_X86_MUNMAP     91
+#define LINUX_X86_SOCKETCALL 102
+#define LINUX_X86_MPROTECT   125
+#define LINUX_X86_EXIT_GROUP 252
+
 static const char *x86_register_classes[] = {
    "General registers",
    "Segment registers",
@@ -122,6 +138,57 @@ bool sk3wldbg_x86_32::save_ret_addr(uint64_t retaddr) {
    uc_mem_write(uc, new_sp, &retaddr, sizeof(uint32_t));
    set_sp(new_sp);
    return true;
+}
+
+bool sk3wldbg_x86_32::is_system_call(uint8_t *inst, uint32_t size) {
+   //need to check OS flavor
+   if (size == 2 && 0x80cd == *(uint16_t*)inst) {
+      return true;
+   }
+   return false;
+}
+
+void sk3wldbg_x86_32::handle_system_call(uint8_t *inst, uint32_t size) {
+   //need to check OS flavor
+   if (size == 2 && 0x80cd == *(uint16_t*)inst) {
+      uint32_t eax;
+      uc_reg_read(uc, UC_X86_REG_EAX, &eax);
+      switch (eax) {
+         case LINUX_X86_EXIT:
+            uc_emu_stop(uc);
+            break;
+         case LINUX_X86_FORK:
+            break;
+         case LINUX_X86_READ:
+            break;
+         case LINUX_X86_WRITE:
+            break;
+         case LINUX_X86_OPEN:
+            break;
+         case LINUX_X86_CLOSE:
+            break;
+         case LINUX_X86_PTRACE:
+            break;
+         case LINUX_X86_ALARM:
+            break;
+         case LINUX_X86_BRK:
+            break;
+         case LINUX_X86_SIGNAL:
+            break;
+         case LINUX_X86_MMAP:
+            break;
+         case LINUX_X86_MUNMAP:
+            break;
+         case LINUX_X86_SOCKETCALL:
+            break;
+         case LINUX_X86_MPROTECT:
+            break;
+         case LINUX_X86_EXIT_GROUP:
+            break;
+         default:
+            break;
+      }
+   }
 }
 
 void x86_32_bkpt(uc_engine *uc, sk3wldbg_x86_32 *dbg) {

@@ -23,6 +23,8 @@ struct sk3wldbg_x86_32 : public sk3wldbg {
    sk3wldbg_x86_32();   
    bool save_ret_addr(uint64_t retaddr);
    bool call_changes_sp() {return true;};
+   virtual bool is_system_call(uint8_t *inst, uint32_t size);
+   virtual void handle_system_call(uint8_t *inst, uint32_t size);
 };
 
 struct sk3wldbg_x86_64 : public sk3wldbg {

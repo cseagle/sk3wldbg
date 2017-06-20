@@ -204,6 +204,13 @@ int idaapi print_pc::execute() {
 int idaapi processRunner(void *unicorn) {
    sk3wldbg *uc = (sk3wldbg*)unicorn;
    uc->start(get_screen_ea());
+   debug_event_t detach;
+   detach.eid = PROCESS_DETACH;
+   detach.pid = uc->the_process;
+   detach.tid = uc->the_threads.front();
+   detach.ea  = BADADDR;
+   detach.handled = true;
+   uc->enqueue_debug_evt(detach);
    return 0;
 }
 
@@ -330,6 +337,15 @@ int idaapi uni_start_process(const char * /*path*/,
       }
       fclose(bin);
    }
+   if (uc->get_sp() == 0) {
+      //need a stack too, just sling it somewhere
+      //add it to uc->memory
+      unsigned int stack_top = 0xffffe000;
+      uc->init_memmgr(0x100000, stack_top);
+      uc->map_mem_zero(stack_top - 0x100000, stack_top, UC_PROT_READ | UC_PROT_WRITE | UC_PROT_EXEC);
+      stack_top -= 16;
+      uc->set_sp(stack_top);
+   }
    if (!loaded) {
       //didn't know format, let's try for what we need from IDA
       //init memory, by copying from IDA
@@ -343,15 +359,6 @@ int idaapi uni_start_process(const char * /*path*/,
          void *buf = uc->map_mem_zero(seg->startEA, seg->endEA, ida_to_uc_perms_map[seg->perm]);
          get_many_bytes_ex(seg->startEA, buf, exact, NULL);
       }
-   }
-
-   if (uc->get_sp() == 0) {
-      //need a stack too, just sling it somewhere
-      //add it to uc->memory
-      unsigned int stack_top = 0xc0000000;
-      uc->map_mem_zero(stack_top - 0x100000, stack_top, UC_PROT_READ | UC_PROT_WRITE | UC_PROT_EXEC);
-      stack_top -= 16;
-      uc->set_sp(stack_top);
    }
 
    //init registers
@@ -434,6 +441,7 @@ int idaapi uni_detach_process(void) {
 #ifdef DEBUG
    msg("uni_detach_process thread joined\n");
 #endif
+/*
    debug_event_t detach;
    detach.eid = PROCESS_DETACH;
    detach.pid = uc->the_process;
@@ -441,6 +449,7 @@ int idaapi uni_detach_process(void) {
    detach.ea  = BADADDR;
    detach.handled = true;
    uc->enqueue_debug_evt(detach);
+*/
 #ifdef DEBUG
    msg("uni_detach_process complete\n");
 #endif
@@ -829,6 +838,9 @@ int idaapi uni_get_memory_info(meminfo_vec_t &areas) {
    uc_mem_region *regions;
    uint32_t count;
    uc_err err = uc_mem_regions(uc->uc, &regions, &count);
+#ifdef DEBUG
+   msg("uc_mem_regions returned\n");
+#endif
    if (err == UC_ERR_OK) {
       for (uint32_t i = 0; i < count; i++) {
          memory_info_t mem;
@@ -836,12 +848,18 @@ int idaapi uni_get_memory_info(meminfo_vec_t &areas) {
          mem.endEA = (ea_t)regions[i].end - 1;   //-1 because uc_mem_region is inclusive
          mem.perm = uc_to_ida_perms_map[regions[i].perms];
          areas.push_back(mem);
-/*
+#ifdef DEBUG
          msg("   region %d: 0x%llx-0x%llx (%d)\n", i, (uint64_t)mem.startEA, (uint64_t)mem.endEA, mem.perm);
          msg("   region %d: 0x%llx-0x%llx (%d)\n", i, regions[i].begin, regions[i].end - 1, mem.perm);
-*/
+#endif
       }
-//      free(regions);
+      uc_free(regions);
+#ifdef DEBUG
+      msg("uc_mem_regions returned %d regions\n", count);
+#endif
+   }
+   else {
+      msg("Failed on uc_mem_regions() with error returned %u: %s\n", err, uc_strerror(err));
    }
    return 1;
 }
@@ -885,7 +903,7 @@ ssize_t idaapi uni_write_memory(ea_t ea, const void *buffer, size_t size) {
 /// \return ref BPT_
 int idaapi uni_is_ok_bpt(bpttype_t type, ea_t ea, int /*len*/) {
 #ifdef DEBUG
-   msg("uni_is_ok_bpt called for 0x%llx\n", (uint64_t)ea);
+   msg("uni_is_ok_bpt called for 0x%llx, type: %d\n", (uint64_t)ea, type);
 #endif
    //*** test type and setup appropriate actions in hook functions to break
    //    when appropriate
@@ -1070,7 +1088,7 @@ ea_t idaapi uni_appcall(
      thid_t /*tid*/,
      const struct func_type_data_t * /*fti*/,
      int /*nargs*/,
-     const struct regobjs_t * /*regargs*/,
+     const struct regobjs_t * /*regargs*/,   //qvector<regobj_t>
      struct relobj_t * /*stkargs*/,
      struct regobjs_t * /*retregs*/,
      qstring * /*errbuf*/,
@@ -1085,8 +1103,12 @@ ea_t idaapi uni_appcall(
 
 /*
    sk3wldbg *uc = (sk3wldbg*)dbg;
-   if (!uc->save_registers()) {
-      *errbuf = "Failed to save current register values";
+   if (!uc_context_alloc(uc->uc, &uc->ctx)) {
+      *errbuf = "Failed to allocate unicorn save context";
+      return BADADDR;
+   }
+   if (!uc_context_save(uc->uc, uc->ctx)) {
+      *errbuf = "Failed to save current unicorn context";
       return BADADDR;
    }
    uint64_t addr_size = (inf.lflags & LFLG_64BIT) ? 8 :4;
@@ -1150,7 +1172,11 @@ ea_t idaapi uni_appcall(
    }
 
    //now restore pre-appcall context
-   uc->restore_registers();
+   if (!uc_context_restore(uc->uc, uc->ctx)) {
+      *errbuf = "Failed to restore current unicorn context";
+      return BADADDR;
+   }
+   uc_free(uc->ctx);
    uc->del_bpt(appcall_brk);
 
    return (ea_t)curr_sp;
@@ -1177,7 +1203,13 @@ int idaapi uni_cleanup_appcall(thid_t /*tid*/) {
 
 /*
    sk3wldbg *uc = (sk3wldbg*)dbg;
-   uc->restore_registers();
+
+   if (!uc_context_restore(uc->uc, uc->ctx)) {
+      *errbuf = "Failed to restore current unicorn context";
+      return BADADDR;
+   }
+   uc_free(uc->ctx);
+   uc->del_bpt(appcall_brk);
 
    //remove breakpoint at end of function
 */
@@ -1326,6 +1358,7 @@ sk3wldbg::sk3wldbg(const char *procname, uc_arch arch, uc_mode mode, const char 
    filetype = (uint8_t)inf.filetype;
 
    memory_page_size = 0x1000;
+   memmgr = NULL;
 
    //SET THE FOLLOWING IN YOUR PROCESSOR SPECIFIC SUBCLASS
    register_classes = NULL;
@@ -1390,6 +1423,12 @@ sk3wldbg::~sk3wldbg() {
 #else
       ::close(hProv);
 #endif
+   }
+   if (memmgr) {
+      //is this going to take care of all the mappings
+      //replace the memmap vector with this???
+      delete memmgr;
+      memmgr = NULL;
    }
    for (vector<void*>::iterator i = memmap.begin(); i != memmap.end(); i++) {
       qfree(*i);
@@ -1491,8 +1530,18 @@ bool sk3wldbg::open() {
       msg("Failed on uc_open() with error returned: %u\n", err);
       return false;
    }
+   memmgr = new mem_mgr(uc);
    install_initial_hooks();
    return true;
+}
+
+void sk3wldbg::init_memmgr(uint64_t map_min, uint64_t map_max) {
+   if (memmgr == NULL) {
+      memmgr = new mem_mgr(uc, map_min, map_max);
+   }
+   else {
+      memmgr->set_mmap_region(map_min, map_max);
+   }
 }
 
 void sk3wldbg::map_mem_copy(uint64_t startAddr, uint64_t endAddr, unsigned int perms, void *src) {
@@ -1503,6 +1552,7 @@ void sk3wldbg::map_mem_copy(uint64_t startAddr, uint64_t endAddr, unsigned int p
    }
 }
 
+/*
 void *sk3wldbg::map_mem_zero(uint64_t startAddr, uint64_t endAddr, unsigned int perms) {
    msg("map_mem_zero(0x%llx, 0x%llx, 0x%x)\n", startAddr, endAddr, perms);
    endAddr = (endAddr + 0xfff) & ~0xfff;
@@ -1522,6 +1572,28 @@ void *sk3wldbg::map_mem_zero(uint64_t startAddr, uint64_t endAddr, unsigned int 
          return (startAddr - pageAddr) + (char*)block;
       }
    }
+   return NULL;
+}
+*/
+
+void *sk3wldbg::map_mem_zero(uint64_t startAddr, uint64_t endAddr, unsigned int perms) {
+   msg("map_mem_zero(0x%llx, 0x%llx, 0x%x)\n", startAddr, endAddr, perms);
+   endAddr = (endAddr + 0xfff) & ~0xfff;
+   uint64_t pageAddr = startAddr & ~0xfff;
+   uint64_t blockSize = endAddr - pageAddr;
+   if (blockSize & 0xffffffff00000000ll) {
+      //too large
+      msg("Size too large in map_mem_zero\n");
+      return NULL;
+   }
+   map_block *b = memmgr->mmap(pageAddr, (uint32_t)blockSize, perms);
+   if (b) {
+      //return a pointer to the byte corresponding to startAddr
+      //this may not be the first byte of block if startAddr was not page aligned
+      msg("Allocated at 0x%x in map_mem_zero\n", (uint32_t)startAddr);
+      return (startAddr - pageAddr) + (char*)b->host;
+   }
+   msg("Failed to allocate at 0x%x in map_mem_zero\n", (uint32_t)startAddr);
    return NULL;
 }
 
@@ -1639,6 +1711,7 @@ bool generic_mem_fault_hook(uc_engine *uc, uc_mem_type type, uint64_t address,
 //This function is called from within the unicorn thread
 //We do all checking for debugger related events at each instruction here
 void generic_code_hook(uc_engine *uc, uint64_t address, uint32_t size, sk3wldbg *dbg) {
+   bool stopping = false;
 #ifdef DEBUG
    char buf[1204];
    ::qsnprintf(buf, sizeof(buf), "code hit at: 0x%llx\n", address);
@@ -1703,7 +1776,16 @@ void generic_code_hook(uc_engine *uc, uint64_t address, uint32_t size, sk3wldbg 
       case RS_TERM:
          //break out of emulation loop
          uc_emu_stop(uc);
+         stopping = true;
+         break;
    }
+
+   uint8_t *inst = new uint8_t[size]; //change over to to_host_ptr when mem_mgr gets integrated
+   uc_mem_read(uc, address, inst, size);
+   if (!stopping && dbg->is_system_call(inst, size)) {
+      dbg->handle_system_call(inst, size);
+   }
+   delete [] inst;
 }
 
 run_state sk3wldbg::get_state() {
