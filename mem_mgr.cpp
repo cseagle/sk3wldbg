@@ -205,11 +205,15 @@ map_block *mem_mgr::mmap(uint64_t addr, uint32_t length, uint32_t perms) {
          b = find_block(addr);
          if (b) {
             addr = b->guest - length;
+#ifdef DEBUG
             msg("mmap1: addr set to 0x%x\n", (uint32_t)addr);
+#endif
          }
          else if (n == NULL) {
             guest = addr;
+#ifdef DEBUG
             msg("mmap2: guest set to 0x%x\n", (uint32_t)guest);
+#endif
          }
          else {
             b = prev_block(addr);
@@ -218,7 +222,9 @@ map_block *mem_mgr::mmap(uint64_t addr, uint32_t length, uint32_t perms) {
                uint64_t gap = n->guest - addr;
                if (gap >= length) {
                   guest = addr;
+#ifdef DEBUG
                   msg("mmap3: guest set to 0x%x\n", (uint32_t)guest);
+#endif
                }
                else {
                   n = b;
@@ -228,7 +234,9 @@ map_block *mem_mgr::mmap(uint64_t addr, uint32_t length, uint32_t perms) {
                uint64_t gap = n->guest - addr;
                if (gap >= length) {
                   guest = addr;
+#ifdef DEBUG
                   msg("mmap4: guest set to 0x%x\n", (uint32_t)guest);
+#endif
                }
                else {
                   //hit bottom;
@@ -238,27 +246,37 @@ map_block *mem_mgr::mmap(uint64_t addr, uint32_t length, uint32_t perms) {
          }
       }
       addr = orig;
+#ifdef DEBUG
       msg("mmap5: addr set to 0x%x\n", (uint32_t)addr);
+#endif
       while (guest == 0 && addr <= max_alloc) {
          b = find_block(addr);
          n = next_block(addr);
          if (b) {
             addr = b->guest + b->length;
+#ifdef DEBUG
             msg("mmap6: addr set to 0x%x\n", (uint32_t)addr);
+#endif
          }
          else if (n == NULL) {
             guest = addr;
+#ifdef DEBUG
             msg("mmap7: guest set to 0x%x\n", (uint32_t)guest);
+#endif
          }
          else {
             uint64_t gap = n->guest - addr;
             if (gap >= length) {
                guest = addr;
+#ifdef DEBUG
                msg("mmap8: guest set to 0x%x\n", (uint32_t)guest);
+#endif
             }
             else {
                addr = n->guest + n->length;
+#ifdef DEBUG
                msg("mmap9: addr set to 0x%x\n", (uint32_t)addr);
+#endif
             }
          }
       }
@@ -270,7 +288,9 @@ map_block *mem_mgr::mmap(uint64_t addr, uint32_t length, uint32_t perms) {
          if (b == NULL) {
             if (top >= (length + map_min)) {
                guest = top - length;
+#ifdef DEBUG
                msg("mmap10: guest set to 0x%x\n", (uint32_t)guest);
+#endif
             }
             break;
          }
@@ -278,7 +298,9 @@ map_block *mem_mgr::mmap(uint64_t addr, uint32_t length, uint32_t perms) {
             if ((top - (b->guest + b->length)) > length) {
                //fits in the gap
                guest = top - length;
+#ifdef DEBUG
                msg("mmap11: guest set to 0x%x\n", (uint32_t)guest);
+#endif
                break;
             }
             top = b->guest;

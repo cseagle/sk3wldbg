@@ -114,6 +114,7 @@ struct sk3wldbg : public debugger_t {
    
    uc_hook code_hook;
    uc_hook mem_fault_hook;
+   uc_hook ihook;
    
    event_id_t last_eid;
    

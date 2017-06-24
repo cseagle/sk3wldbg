@@ -213,7 +213,7 @@ static int32_t mips64_reg_map[] = {
    UC_MIPS_REG_PC
 };
 
-sk3wldbg_mips::sk3wldbg_mips() : sk3wldbg("mipsl", UC_ARCH_MIPS, UC_MODE_32) {
+sk3wldbg_mips::sk3wldbg_mips() : sk3wldbg("mipsl", UC_ARCH_MIPS, UC_MODE_MIPS32) {
    //reset any overridden function pointers and setup register name fields
 
    if (debug_mode & UC_MODE_BIG_ENDIAN) {
@@ -235,7 +235,7 @@ bool sk3wldbg_mips::save_ret_addr(uint64_t retaddr) {
    return true;
 }
 
-sk3wldbg_mips64::sk3wldbg_mips64() : sk3wldbg("mipsl", UC_ARCH_MIPS, UC_MODE_64) {
+sk3wldbg_mips64::sk3wldbg_mips64() : sk3wldbg("mipsl", UC_ARCH_MIPS, UC_MODE_MIPS64) {
    //reset any overridden function pointers and setup register name fields
 
    if (debug_mode & UC_MODE_BIG_ENDIAN) {
