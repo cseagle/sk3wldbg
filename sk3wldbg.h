@@ -180,4 +180,71 @@ struct mem_map_action_handler : public action_handler_t {
    action_state_t idaapi update(action_update_ctx_t *ctx);
 };
 
+//Some idasdk70 transition macros
+#if IDA_SDK_VERSION >= 700
+
+#define startEA start_ea 
+#define endEA end_ea 
+
+#define minEA min_ea
+#define maxEA max_ea
+#define ominEA omin_ea
+#define omaxEA omax_ea
+#define procName procname
+
+#define get_flags_novalue(ea) get_flags(ea)
+#define isEnum0(f) is_enum0(f)
+#define isEnum1(f) is_enum1(f)
+#define isStroff0(f) is_stroff0(f)
+#define isStroff1(f) is_stroff1(f)
+#define isOff0(f) is_off0(f)
+#define isOff1(f) is_off1(f)
+#define isOff(f, n) is_off(f, n)
+#define isEnum(f, n) is_enum(f, n)
+#define isStroff(f, n) is_stroff(f, n)
+#define isUnknown(f) is_unknown(f)
+#define getFlags(f) get_flags(f)
+
+#define isStruct(f) is_struct(f)
+#define isASCII(f) is_strlit(f)
+#define do_unknown(a, f) del_items(a, f)
+#define do_unknown_range(a, s, f) del_items(a, f, s)
+#define isCode(f) is_code(f)
+
+#define get_member_name2 get_member_name
+
+#define put_many_bytes(a, b, s) put_bytes(a, b, s)
+#define patch_many_bytes(a, b, s) patch_bytes(a, b, s)
+#define get_many_bytes(a, b, s) get_bytes(a, b, s)
+
+#define do_data_ex(a, d, s, t) create_data(a, d, s, t)
+#define doDwrd(a, l) create_dword(a, l)
+#define doStruct(a, l, t) create_struct(a, l, t)
+
+#define dwrdflag dwordflag
+
+#define isEnabled(a) is_mapped(a)
+#define isLoaded(a) is_loaded(a)
+
+#define switchto_tform(w, f) activate_widget(w, f)
+#define find_tform(c) find_widget(c)
+
+#else //Some idasdk70 transition macros
+
+#define start_ea startEA
+#define end_ea endEA
+
+#define ev_add_cref add_cref
+#define ev_add_dref add_dref
+#define ev_del_cref del_cref
+#define ev_del_dref del_dref
+#define ev_oldfile oldfile
+#define ev_newfile newfile
+#define ev_auto_queue_empty auto_queue_empty
+
+#define set_func_start func_setstart 
+#define set_func_end func_setend
+
+#endif //Some idasdk70 transition macros
+
 #endif

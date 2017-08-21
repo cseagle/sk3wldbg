@@ -43,7 +43,11 @@
 #include <typeinf.hpp>
 #include <nalt.hpp>
 #include <segment.hpp>
+#if IDA_SDK_VERSION >= 700
+#include <segregs.hpp>
+#else
 #include <srarea.hpp>
+#endif
 #include <typeinf.hpp>
 #include <struct.hpp>
 #include <entry.hpp>
@@ -75,7 +79,11 @@ static action_desc_t mem_map_action = {
 
 static bool registered = false;
 
+#if IDA_SDK_VERSION >= 700
+static ssize_t idaapi ui_hook(void *user_data, int notification_code, va_list va) {
+#else
 static int idaapi ui_hook(void *user_data, int notification_code, va_list va) {
+#endif
    switch (notification_code) {
       case ui_debugger_menu_change: {
          bool enable = va_arg(va, int) != 0;
@@ -214,9 +222,15 @@ void idaapi plugin_term(void) {
 #endif
 }
 
+#if IDA_SDK_VERSION >= 700
+bool idaapi plugin_run(size_t /*arg*/) {
+   return true;
+}
+#else
 void idaapi plugin_run(int /*arg*/) {
    return;
 }
+#endif
 
 //--------------------------------------------------------------------------
 //

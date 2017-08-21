@@ -239,7 +239,7 @@ static uint64_t uc_push_str(sk3wldbg *uc, uint64_t sp, const char *val, bool wit
    if (with_null) {
       sz++;
    }
-   return uc_push_buf(uc, sp, (void*)val, sz);
+   return uc_push_buf(uc, sp, (void*)val, (uint32_t)sz);
 }
 
 static uint64_t create_elf_env(sk3wldbg *uc, uint64_t sp, const char *args, bool is_64, bool big_endian) {
@@ -325,7 +325,7 @@ static uint64_t create_elf_env(sk3wldbg *uc, uint64_t sp, const char *args, bool
    //null terminate argv array
    sp = uc_push(uc, sp, 0, is_64, big_endian);
    //remember argc
-   uint32_t argc = argv.size();
+   uint32_t argc = (uint32_t)argv.size();
 
    //push argv pointers   
    for (qvector<uint64_t>::iterator i = argv.begin(); i != argv.end(); i++) {

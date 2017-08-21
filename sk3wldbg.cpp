@@ -63,7 +63,11 @@
 #include <typeinf.hpp>
 #include <nalt.hpp>
 #include <segment.hpp>
+#if IDA_SDK_VERSION >= 700
+#include <segregs.hpp>
+#else
 #include <srarea.hpp>
+#endif
 #include <typeinf.hpp>
 #include <struct.hpp>
 #include <entry.hpp>
@@ -220,6 +224,25 @@ int idaapi processRunner(void *unicorn) {
    return 0;
 }
 
+#if IDA_SDK_VERSION >= 700
+/// Return information about the n-th "compatible" running process.
+/// If n is 0, the processes list is reinitialized.
+/// This function is called from the main thread.
+/// \retval 1  ok
+/// \retval 0  failed
+/// \retval -1 network error
+int idaapi uni_get_processes(procinfo_vec_t *procs) {
+#ifdef DEBUG
+   msg("uni_get_processes called\n");
+#endif
+   sk3wldbg *uc = (sk3wldbg*)dbg;
+   process_info_t info;
+   info.name = "Unicorn Process";
+   info.pid = uc->the_process;
+   procs->push_back(info);
+   return 1;
+}
+#else
 /// Return information about the n-th "compatible" running process.
 /// If n is 0, the processes list is reinitialized.
 /// This function is called from the main thread.
@@ -238,7 +261,10 @@ int idaapi uni_process_get_info(int n, process_info_t *info) {
    info->pid = uc->the_process;
    return 1;
 }
+#endif
 
+#if IDA_SDK_VERSION < 700
+//*** Learn proper way to do this in Ida 7.0
 struct install_menu : public exec_request_t {
    sk3wldbg *uc;
    install_menu(sk3wldbg *_uc) : uc(_uc) {};
@@ -251,6 +277,7 @@ int idaapi install_menu::execute() {
    uc->registered_menu = true;
    return 0;
 }
+#endif
 
 /// Start an executable to debug.
 /// This function is called from debthread.
@@ -279,8 +306,12 @@ int idaapi uni_start_process(const char * /*path*/,
 #endif
    sk3wldbg *uc = (sk3wldbg*)dbg;
 
+#if IDA_SDK_VERSION < 700
+   //*** Learn proper way to do this in Ida 7.0
    install_menu req(uc);
    execute_sync(req, MFF_FAST);
+#endif
+
    
    ea_t init_pc = get_screen_ea();
 
@@ -365,7 +396,7 @@ int idaapi uni_start_process(const char * /*path*/,
       for (seg = get_first_seg(); seg != NULL; seg = get_next_seg(seg->startEA)) {
          ssize_t exact = (ssize_t)(seg->endEA - seg->startEA);
          void *buf = uc->map_mem_zero(seg->startEA, seg->endEA, ida_to_uc_perms_map[seg->perm]);
-         get_many_bytes_ex(seg->startEA, buf, exact, NULL);
+         get_many_bytes(seg->startEA, buf, exact);
       }
    }
 
@@ -985,7 +1016,11 @@ int idaapi uni_update_lowcnds(const lowcnd_t * /*lowcnds*/, int nlowcnds) {
 /// Open/close/read a remote file.
 /// These functions are called from the main thread
 /// -1-error
+#if IDA_SDK_VERSION >= 700
+int idaapi uni_open_file(const char *file, uint64 * /*fsize*/, bool /*readonly*/) {
+#else
 int idaapi uni_open_file(const char *file, uint32 * /*fsize*/, bool /*readonly*/) {
+#endif
 #ifdef DEBUG
    msg("uni_open_file called (%s)\n", file);
 #endif
@@ -999,7 +1034,11 @@ void idaapi uni_close_file(int /*fn*/) {
    return;
 }
 
+#if IDA_SDK_VERSION >= 700
+ssize_t idaapi uni_read_file(int /*fn*/, int64 /*off*/, void * /*buf*/, size_t /*size*/) {
+#else
 ssize_t idaapi uni_read_file(int /*fn*/, uint32 /*off*/, void * /*buf*/, size_t /*size*/) {
+#endif
 #ifdef DEBUG
    msg("uni_read_file called\n");
 #endif
@@ -1247,7 +1286,11 @@ int idaapi uni_eval_lowcnd(thid_t /*tid*/, ea_t ea) {
 }
 
 /// This function is called from main thread
+#if IDA_SDK_VERSION >= 700
+ssize_t idaapi uni_write_file(int /*fn*/, int64 /*off*/, const void * /*buf*/, size_t /*size*/) {
+#else
 ssize_t idaapi uni_write_file(int /*fn*/, uint32 /*off*/, const void * /*buf*/, size_t /*size*/) {
+#endif
 #ifdef DEBUG
    msg("uni_write_file called\n");
 #endif
@@ -1360,7 +1403,7 @@ sk3wldbg::sk3wldbg(const char *procname, uc_arch arch, uc_mode mode, const char 
    finished = false;
    single_step = false;
    registered_menu = false;
-   if (inf.mf) {
+   if (inf.is_be()) {
       debug_mode = (uc_mode)((int)UC_MODE_BIG_ENDIAN | (int)debug_mode);
       msg("sk3wldbg: Setting Big-Endian mode\n");
    }
@@ -1389,7 +1432,11 @@ sk3wldbg::sk3wldbg(const char *procname, uc_arch arch, uc_mode mode, const char 
 
    init_debugger =               uni_init_debugger;
    term_debugger =               uni_term_debugger;
+#if IDA_SDK_VERSION >= 700
+   get_processes =               uni_get_processes;
+#else
    process_get_info =            uni_process_get_info;
+#endif
    start_process =               uni_start_process;
    attach_process =              uni_attach_process;
    detach_process =              uni_detach_process;
@@ -1894,7 +1941,12 @@ void sk3wldbg::install_initial_hooks() {
 
 bool sk3wldbg::read_register(int regidx, regval_t *value) {
    int32_t rtype = RVT_INT;
-   if (_registers[regidx].dtyp == dt_float || _registers[regidx].dtyp == dt_double) {
+#if IDA_SDK_VERSION >= 700
+   op_dtype_t dt = _registers[regidx].dtype;
+#else
+   char dt = _registers[regidx].dtyp;   
+#endif
+   if (dt == dt_float || dt == dt_double) {
       rtype = RVT_FLOAT;
    }
    value->rvtype = rtype;

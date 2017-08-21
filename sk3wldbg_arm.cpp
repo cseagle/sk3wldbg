@@ -20,7 +20,11 @@
 #include "sk3wldbg_arm.h"
 #include <idp.hpp>
 #include <segment.hpp>
+#if IDA_SDK_VERSION >= 700
+#include <segregs.hpp>
+#else
 #include <srarea.hpp>
+#endif
 
 static const char *arm_register_classes[] = {
    "General registers",
