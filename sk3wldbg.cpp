@@ -1403,7 +1403,11 @@ sk3wldbg::sk3wldbg(const char *procname, uc_arch arch, uc_mode mode, const char 
    finished = false;
    single_step = false;
    registered_menu = false;
+#if IDA_SDK_VERSION >= 700
    if (inf.is_be()) {
+#else
+   if (inf.mf) {   
+#endif
       debug_mode = (uc_mode)((int)UC_MODE_BIG_ENDIAN | (int)debug_mode);
       msg("sk3wldbg: Setting Big-Endian mode\n");
    }
