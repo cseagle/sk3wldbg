@@ -81,7 +81,7 @@ OUTDIR=$(IDA_SDK)bin/plugins/
 
 SRCS=sk3wldbg.cpp sk3wldbg_arm.cpp sk3wldbg_m68k.cpp \
    sk3wldbg_mips.cpp sk3wldbg_plugin.cpp sk3wldbg_ppc.cpp \
-   sk3wldbg_sparc.cpp sk3wldbg_x86.cpp loader.cpp
+   sk3wldbg_sparc.cpp sk3wldbg_x86.cpp loader.cpp mem_mgr.cpp
 
 BINARY32=$(OUTDIR)$(PROC)$(PLUGIN_EXT32)
 BINARY64=$(OUTDIR)$(PROC)$(PLUGIN_EXT64)
