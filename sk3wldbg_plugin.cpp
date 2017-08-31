@@ -71,7 +71,7 @@ static action_desc_t mem_map_action = {
    "sk3wldbg:mem_map",
    "Map memory...",
    &mem_map_handler,
-   NULL,
+   &PLUGIN,
    NULL,
    NULL,
    0
