@@ -61,8 +61,48 @@
 #include "sk3wldbg_sparc.h"
 #include "sk3wldbg_ppc.h"
 #include "sk3wldbg_m68k.h"
+#include "idc_funcs.h"
 
 static bool hooked = false;
+
+int idaapi plugin_init(void);
+void idaapi plugin_term(void);
+
+#if IDA_SDK_VERSION >= 700
+bool idaapi plugin_run(size_t /*arg*/) {
+   return true;
+}
+#else
+void idaapi plugin_run(int /*arg*/) {
+   return;
+}
+#endif
+
+//--------------------------------------------------------------------------
+//
+//      PLUGIN DESCRIPTION BLOCK
+//
+//--------------------------------------------------------------------------
+
+plugin_t PLUGIN = {
+  IDP_INTERFACE_VERSION,
+  PLUGIN_DBG | PLUGIN_HIDE,   // plugin flags
+
+  plugin_init,                 // initialize
+
+  plugin_term,                 // terminate. this pointer may be NULL.
+
+  plugin_run,                  // invoke plugin
+
+  "Sk3wlDbg",                   // long comment about the plugin
+                        // it could appear in the status line
+                        // or as a hint
+
+  "Sk3wlDbg",                   // multiline help about the plugin
+
+  "Sk3wlDbg",            // the preferred short name of the plugin
+  ""                    // the preferred hotkey to run the plugin
+};
 
 static mem_map_action_handler mem_map_handler;
 
@@ -123,6 +163,7 @@ static int idaapi ui_hook(void *user_data, int notification_code, va_list va) {
 //      See the hook_to_notification_point() function.
 //
 int idaapi plugin_init(void) {
+   sk3wldbg *sdbg = NULL;
    msg("sk3wldbg trying to init\n");
    int debug_mode = UC_MODE_32;
    if (inf.lflags & LFLG_64BIT) {
@@ -138,45 +179,45 @@ int idaapi plugin_init(void) {
    switch (ph.id) {
       case PLFM_386:
          if (debug_mode == UC_MODE_32) {
-            dbg = new sk3wldbg_x86_32();
+            sdbg = new sk3wldbg_x86_32();
          }
          else {
-            dbg = new sk3wldbg_x86_64();
+            sdbg = new sk3wldbg_x86_64();
          }
          break;
       case PLFM_68K:
-         dbg = new sk3wldbg_m68k();
+         sdbg = new sk3wldbg_m68k();
          break;
       case PLFM_ARM:
          if (debug_mode == UC_MODE_32) {
-            dbg = new sk3wldbg_arm();
+            sdbg = new sk3wldbg_arm();
          }
          else {
-            dbg = new sk3wldbg_aarch64();
+            sdbg = new sk3wldbg_aarch64();
          }
          break;
       case PLFM_MIPS:
          if (debug_mode == UC_MODE_32) {
-            dbg = new sk3wldbg_mips();
+            sdbg = new sk3wldbg_mips();
          }
          else {
-            dbg = new sk3wldbg_mips64();
+            sdbg = new sk3wldbg_mips64();
          }
          break;
       case PLFM_SPARC:
          if (debug_mode == UC_MODE_32) {
-            dbg = new sk3wldbg_sparc();
+            sdbg = new sk3wldbg_sparc();
          }
          else {
-            dbg = new sk3wldbg_sparc64();
+            sdbg = new sk3wldbg_sparc64();
          }
          break;
       case PLFM_PPC:
          if (debug_mode == UC_MODE_32) {
-            dbg = new sk3wldbg_ppc();
+            sdbg = new sk3wldbg_ppc();
          }
          else {
-            dbg = new sk3wldbg_ppc64();
+            sdbg = new sk3wldbg_ppc64();
          }
          break;
       default:
@@ -185,6 +226,8 @@ int idaapi plugin_init(void) {
    }
 //   hook_to_notification_point(::HT_UI, ui_hook, dbg);
 //   hooked = true;
+   dbg = sdbg;
+   register_funcs(sdbg);
    register_action(mem_map_action);
    registered = true;
    msg(PLUGIN_NAME" keeping sk3wldbg\n");
@@ -222,38 +265,3 @@ void idaapi plugin_term(void) {
 #endif
 }
 
-#if IDA_SDK_VERSION >= 700
-bool idaapi plugin_run(size_t /*arg*/) {
-   return true;
-}
-#else
-void idaapi plugin_run(int /*arg*/) {
-   return;
-}
-#endif
-
-//--------------------------------------------------------------------------
-//
-//      PLUGIN DESCRIPTION BLOCK
-//
-//--------------------------------------------------------------------------
-
-plugin_t PLUGIN = {
-  IDP_INTERFACE_VERSION,
-  PLUGIN_DBG | PLUGIN_HIDE,   // plugin flags
-
-  plugin_init,                 // initialize
-
-  plugin_term,                 // terminate. this pointer may be NULL.
-
-  plugin_run,                  // invoke plugin
-
-  "Sk3wlDbg",                   // long comment about the plugin
-                        // it could appear in the status line
-                        // or as a hint
-
-  "Sk3wlDbg",                   // multiline help about the plugin
-
-  "Sk3wlDbg",            // the preferred short name of the plugin
-  ""                    // the preferred hotkey to run the plugin
-};

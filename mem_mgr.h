@@ -29,7 +29,7 @@ class mem_mgr {
    void remove(map_block *tree, map_block *node);
 
 public:
-   mem_mgr(uc_engine *uc) : uc(uc) {};
+   mem_mgr(uc_engine *uc);
    mem_mgr(uc_engine *uc, uint64_t map_min, uint64_t map_max);
    ~mem_mgr();
 

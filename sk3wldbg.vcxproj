@@ -79,13 +79,19 @@
     <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='Release64|Win32'">false</LinkIncremental>
     <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='Release64|x64'">false</LinkIncremental>
     <TargetExt Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">.plw</TargetExt>
-    <TargetExt Condition="'$(Configuration)|$(Platform)'=='Release|x64'">.plw</TargetExt>
+    <TargetExt Condition="'$(Configuration)|$(Platform)'=='Release|x64'">.dll</TargetExt>
     <TargetExt Condition="'$(Configuration)|$(Platform)'=='Release64|Win32'">.p64</TargetExt>
-    <TargetExt Condition="'$(Configuration)|$(Platform)'=='Release64|x64'">.p64</TargetExt>
+    <TargetExt Condition="'$(Configuration)|$(Platform)'=='Release64|x64'">.dll</TargetExt>
     <TargetName Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(ProjectName)_user</TargetName>
     <TargetName Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(ProjectName)_user</TargetName>
     <TargetName Condition="'$(Configuration)|$(Platform)'=='Release64|Win32'">$(ProjectName)_user</TargetName>
-    <TargetName Condition="'$(Configuration)|$(Platform)'=='Release64|x64'">$(ProjectName)_user</TargetName>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='Release64|x64'">$(ProjectName)_user64</TargetName>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <OutDir>..\..\bin\plugins</OutDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release64|x64'">
+    <OutDir>..\..\bin\plugins</OutDir>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <Midl>
@@ -166,10 +172,10 @@
     </ResourceCompile>
     <Link>
       <AdditionalOptions>/export:PLUGIN %(AdditionalOptions)</AdditionalOptions>
-      <AdditionalDependencies>ida.lib;unicorn_staload.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>ida.lib;unicorn_staload64.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <OutputFile>$(OutDir)$(ProjectName)_user$(TargetExt)</OutputFile>
       <SuppressStartupBanner>true</SuppressStartupBanner>
-      <AdditionalLibraryDirectories>lib\x64;..\..\lib\x86_win_vc_32;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>lib\x64;..\..\lib\x64_win_vc_32;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <RandomizedBaseAddress>false</RandomizedBaseAddress>
       <DataExecutionPrevention>
       </DataExecutionPrevention>
@@ -260,8 +266,8 @@
     </ResourceCompile>
     <Link>
       <AdditionalOptions>/export:PLUGIN %(AdditionalOptions)</AdditionalOptions>
-      <AdditionalDependencies>ida.lib;unicorn_staload.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <OutputFile>$(OutDir)$(ProjectName)_user$(TargetExt)</OutputFile>
+      <AdditionalDependencies>ida.lib;unicorn_staload64.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <OutputFile>$(OutDir)$(ProjectName)_user64$(TargetExt)</OutputFile>
       <SuppressStartupBanner>true</SuppressStartupBanner>
       <AdditionalLibraryDirectories>lib\x64;..\..\lib\x64_win_vc_64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <RandomizedBaseAddress>false</RandomizedBaseAddress>
@@ -276,6 +282,7 @@
     </Bscmake>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="idc_funcs.cpp" />
     <ClCompile Include="loader.cpp" />
     <ClCompile Include="mem_mgr.cpp" />
     <ClCompile Include="sk3wldbg.cpp" />
@@ -288,6 +295,7 @@
     <ClCompile Include="sk3wldbg_x86.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="idc_funcs.h" />
     <ClInclude Include="loader.h" />
     <ClInclude Include="mem_mgr.h" />
     <ClInclude Include="sk3wldbg.h" />

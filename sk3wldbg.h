@@ -215,13 +215,13 @@ struct mem_map_action_handler : public action_handler_t {
 
 #define put_many_bytes(a, b, s) put_bytes(a, b, s)
 #define patch_many_bytes(a, b, s) patch_bytes(a, b, s)
-#define get_many_bytes(a, b, s) get_bytes(a, b, s)
+#define get_many_bytes(a, b, s) get_bytes(b, s, a)
 
 #define do_data_ex(a, d, s, t) create_data(a, d, s, t)
 #define doDwrd(a, l) create_dword(a, l)
 #define doStruct(a, l, t) create_struct(a, l, t)
 
-#define dwrdflag dwordflag
+#define dwrdflag dword_flag
 
 #define isEnabled(a) is_mapped(a)
 #define isLoaded(a) is_loaded(a)
@@ -229,7 +229,10 @@ struct mem_map_action_handler : public action_handler_t {
 #define switchto_tform(w, f) activate_widget(w, f)
 #define find_tform(c) find_widget(c)
 
-#else //Some idasdk70 transition macros
+#define get_segreg(a, r) get_sreg(a, r)
+#define AskUsingForm_c ask_form
+
+#else //Some idasdk70 transition macros, we are pre 7.0 below
 
 #define start_ea startEA
 #define end_ea endEA
@@ -244,6 +247,10 @@ struct mem_map_action_handler : public action_handler_t {
 
 #define set_func_start func_setstart 
 #define set_func_end func_setend
+
+#define get_sreg(a, r) get_segreg(a, r)
+
+#define ask_form AskUsingForm_c
 
 #endif //Some idasdk70 transition macros
 

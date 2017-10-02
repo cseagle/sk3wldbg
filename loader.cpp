@@ -194,7 +194,7 @@ uint32_t get_elf_32(void *pdata, bool big_endian) {
 
 uint64_t get_elf_64(void *pdata, bool big_endian) {
    uint64_t *d = (uint64_t*)pdata;
-   return big_endian ? swap64(*d) : *d;
+   return big_endian ? swap64((ulonglong)*d) : *d;
 }
 
 static uint64_t uc_push_8(sk3wldbg *uc, uint64_t sp, uint8_t val) {
@@ -215,7 +215,7 @@ static uint64_t uc_push_32(sk3wldbg *uc, uint64_t sp, uint32_t val, bool big_end
 static uint64_t uc_push_64(sk3wldbg *uc, uint64_t sp, uint64_t val, bool big_endian) {
    sp -= sizeof(val);
    if (big_endian) {
-      val = swap64(val);
+      val = swap64((ulonglong)val);
    }
    uc_mem_write(uc->uc, sp, &val, sizeof(val));
    return sp;

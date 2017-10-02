@@ -15,6 +15,14 @@ mem_mgr::mem_mgr(uc_engine *uc, uint64_t map_min, uint64_t map_max) {
    set_mmap_region(map_min, map_max);
 }
 
+mem_mgr::mem_mgr(uc_engine *uc) {
+   root = NULL;
+   this->uc = uc;
+   map_min = 0;
+   map_max = 0;
+   max_block = 0;
+}
+
 mem_mgr::~mem_mgr() {
    //need to free/unmap all the pages
 }

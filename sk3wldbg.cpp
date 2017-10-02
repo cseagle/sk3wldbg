@@ -214,6 +214,7 @@ int idaapi print_pc::execute() {
 int idaapi processRunner(void *unicorn) {
    sk3wldbg *uc = (sk3wldbg*)unicorn;
    uc->start(get_screen_ea());
+   //unicorn start has returned, process has ended, so tell IDA to detach
    debug_event_t detach;
    detach.eid = PROCESS_DETACH;
    detach.pid = uc->the_process;
@@ -852,7 +853,11 @@ int idaapi uni_write_register(thid_t /*tid*/, int regidx, const regval_t *value)
 /// \retval  1  ok
 /// \retval  0  failed
 /// \retval -1  network error
+#if IDA_SDK_VERSION >= 700
+int idaapi uni_thread_get_sreg_base(ea_t *answer, thid_t /*tid*/, int /*sreg_value*/) {
+#else
 int idaapi uni_thread_get_sreg_base(thid_t /*tid*/, int /*sreg_value*/, ea_t *answer) {
+#endif
 #ifdef DEBUG
    msg("uni_thread_get_sreg_base called\n");
 #endif
@@ -1373,6 +1378,12 @@ void idaapi uni_get_debapp_attrs(debapp_attrs_t *out_pattrs) {
    return;
 }
 
+#if IDA_SDK_VERSION >= 700
+bool idaapi uni_get_srcinfo_path(qstring *path, ea_t base) {
+   return false;
+}
+#endif
+
 sk3wldbg::sk3wldbg(const char *procname, uc_arch arch, uc_mode mode, const char *cpu_model) {
    version = IDD_INTERFACE_VERSION;
    uc = NULL;
@@ -1479,6 +1490,9 @@ sk3wldbg::sk3wldbg(const char *procname, uc_arch arch, uc_mode mode, const char 
    is_tracing_enabled =          uni_is_tracing_enabled;
    rexec =                       uni_rexec;
    get_debapp_attrs =            uni_get_debapp_attrs;
+#if IDA_SDK_VERSION >= 700
+   get_srcinfo_path =            uni_get_srcinfo_path;
+#endif
 }
 
 sk3wldbg::~sk3wldbg() {
