@@ -63,7 +63,7 @@ endif
 EXTRALIBS=-lunicorn
 
 # Destination directory for compiled plugins
-OUTDIR=$(IDA_SDK)bin/plugins/
+OUTDIR=./bin/
 
 #OBJDIR32=x64/
 #OBJDIR64=x86/
@@ -126,6 +126,8 @@ $(BINARY64): $(SRCS)
 
 endif
 
+$(OUTDIR):
+	-@mkdir -p $(OUTDIR)
 
 #change sk3wldbg below to the name of your plugin, make sure to add any 
 #additional files that your plugin is dependent on
