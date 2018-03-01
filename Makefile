@@ -102,11 +102,11 @@ endif
 $(OUTDIR):
 	-@mkdir -p $(OUTDIR)
 
-#$(OBJDIR32):
-#	-@mkdir -p $(OBJDIR32)
+$(OBJDIR32):
+	-@mkdir -p $(OBJDIR32)
 
-#$(OBJDIR64):
-#	-@mkdir -p $(OBJDIR64)
+$(OBJDIR64):
+	-@mkdir -p $(OBJDIR64)
 
 CC=g++
 INC=-I$(IDA_SDK)include/ -I./include/
@@ -125,9 +125,6 @@ $(BINARY64): $(SRCS)
 	$(LD) $(LDFLAGS) -o $@ -D__EA64__ $(CFLAGS) $(SRCS) $(INC) $(IDADIR) $(IDALIB64) $(EXTRALIBS) 
 
 endif
-
-$(OUTDIR):
-	-@mkdir -p $(OUTDIR)
 
 #change sk3wldbg below to the name of your plugin, make sure to add any 
 #additional files that your plugin is dependent on
