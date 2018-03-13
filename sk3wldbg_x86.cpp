@@ -195,13 +195,20 @@ void x86_32_bkpt(uc_engine *uc, sk3wldbg_x86_32 *dbg) {
    uc_emu_stop(uc);
    dbg->emu_state = RS_PAUSE;
    debug_event_t brk;
-   brk.eid = BREAKPOINT;
+
+#if IDA_SDK_VERSION >= 710
+   brk.set_eid(::BREAKPOINT);
+   bptaddr_t &bpt = brk.bpt();
+#else
+   brk.eid = ::BREAKPOINT;
+   e_breakpoint_t &bpt = brk.bpt;
+#endif
    brk.pid = dbg->the_process;
    brk.tid = dbg->the_threads.front();
    brk.ea = (ea_t)dbg->get_pc();
    msg("x86 breakpoint hit at: 0x%llx\n", (uint64_t)brk.ea);
    brk.handled = true;
-   brk.bpt.hea = brk.bpt.kea = brk.ea;
+   bpt.hea = bpt.kea = brk.ea;
    dbg->enqueue_debug_evt(brk);
 }
 

@@ -64,6 +64,22 @@ using std::vector;
 typedef qlist<debug_event_t> evt_list_t;
 typedef qlist<thid_t> thread_list;
 
+#if IDA_SDK_VERSION >= 710
+#define register_classes regclasses
+#define register_classes_default default_regclasses
+#define _registers registers
+#define registers_size nregs
+#define PROCESS_START PROCESS_STARTED
+#define PROCESS_EXIT PROCESS_EXITED
+#define THREAD_START THREAD_STARTED
+#define THREAD_EXIT THREAD_EXITED
+#define LIBRARY_LOAD LIB_LOADED
+#define LIBRARY_UNLOAD LIB_UNLOADED
+#define PROCESS_ATTACH PROCESS_ATTACHED
+#define PROCESS_DETACH PROCESS_DETACHED
+#define PROCESS_SUSPEND PROCESS_SUSPENDED
+#endif
+
 enum run_state {
    RS_INIT = 1,
    RS_RUN,
