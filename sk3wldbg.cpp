@@ -78,16 +78,6 @@
 #include "sk3wldbg.h"
 #include "loader.h"
 
-static unsigned int ida_to_uc_perms_map[] = {
-   UC_PROT_NONE, UC_PROT_EXEC, UC_PROT_WRITE, UC_PROT_EXEC | UC_PROT_WRITE,
-   UC_PROT_READ, UC_PROT_EXEC | UC_PROT_READ, UC_PROT_READ | UC_PROT_WRITE, UC_PROT_ALL
-};
-
-static unsigned int uc_to_ida_perms_map[] = {
-   0, SEGPERM_READ, SEGPERM_WRITE, SEGPERM_READ | SEGPERM_WRITE,
-   SEGPERM_EXEC, SEGPERM_EXEC | SEGPERM_READ, SEGPERM_EXEC | SEGPERM_WRITE, SEGPERM_EXEC | SEGPERM_WRITE | SEGPERM_WRITE
-};
-
 static ssize_t idaapi idd_hook(void * /* ud */, int notification_code, va_list va);
 
 struct safe_msg : public exec_request_t {
@@ -1000,11 +990,16 @@ int idaapi uni_get_memory_info(meminfo_vec_t &areas) {
          mem.startEA = (ea_t)regions[i].begin;
          mem.endEA = (ea_t)regions[i].end - 1;   //-1 because uc_mem_region is inclusive
          mem.perm = uc_to_ida_perms_map[regions[i].perms];
+         mem.bitness = 1;  //default to 32
+         if (uc->debug_mode & UC_MODE_16) {
+            mem.bitness = 0;
+         }
+         else if (uc->debug_mode & UC_MODE_64) {
+            mem.bitness = 2;
+         }
          areas.push_back(mem);
 #ifdef DEBUG
-         qsnprintf(msgbuf, sizeof(msgbuf), "   region %d: 0x%llx-0x%llx (%d)\n", i, (uint64_t)mem.startEA, (uint64_t)mem.endEA, mem.perm);
-         msg("%s", msgbuf);
-         qsnprintf(msgbuf, sizeof(msgbuf), "   region %d: 0x%llx-0x%llx (%d)\n", i, regions[i].begin, regions[i].end - 1, mem.perm);
+         qsnprintf(msgbuf, sizeof(msgbuf), "   region %d: 0x%llx-0x%llx (%d-%d:%d)\n", i, (uint64_t)mem.startEA, (uint64_t)mem.endEA, mem.perm, regions[i].perms, mem.bitness);
          msg("%s", msgbuf);
 #endif
       }

@@ -17,13 +17,36 @@
    Place, Suite 330, Boston, MA 02111-1307 USA
 */
 
+#ifndef USE_DANGEROUS_FUNCTIONS
+#define USE_DANGEROUS_FUNCTIONS 1
+#endif
+
+#ifndef USE_STANDARD_FILE_FUNCTIONS
+#define USE_STANDARD_FILE_FUNCTIONS 1
+#endif
+
 #include <ida.hpp>
 #include <expr.hpp>
+#include <segment.hpp>
+#include <diskio.hpp>
+#include <fpro.h>
+#include <loader.hpp>
 
 #include "sk3wldbg.h"
+#include "loader.h"
 #include "idc_funcs.h"
 
 static sk3wldbg *uc;
+
+#ifdef _WIN32
+#define snprintf _snprintf
+#endif
+
+void format_llx(uint64_t val, qstring &s) {
+   char buf[32];
+   snprintf(buf, sizeof(buf), "%llx", (uint64_t)val);
+   s = buf;
+}
 
 #if IDA_SDK_VERSION >= 700
 
@@ -36,26 +59,96 @@ bool set_idc_func_ex(const char *name, idc_func_t *fp, const char *args, int ext
    func.defvals = NULL;
    func.ndefvals = 0;
    func.flags = extfunc_flags;
-   return add_idc_func(func);
+   bool res = add_idc_func(func);
+   msg("Installing idc func (%s) %s\n", name, res ? "succeeded" : "failed");
+   return res;
 }
 
 #endif
+
+void zero_fill(ea_t base, size_t size) {
+   //Ida patch_xxx is very SLOW!!!!!
+   //workaround is to create temp file containing all your zeros
+   //then load that temp file as an additional binary file
+   char ftmp[1024];
+   qtmpnam(ftmp, sizeof(ftmp));
+   size_t block = size;
+   if (block > 0x10000) {
+      block = 0x10000;
+   }
+   void *zeros = calloc(block, 1);
+   FILE *f = fopen(ftmp, "wb");
+   for (size_t done = 0; done < size; done += block) {
+      block = size - done;
+      if (block > 0x10000) {
+         block = 0x10000;
+      }
+      fwrite(zeros, block, 1, f);
+   }
+   free(zeros);
+   fclose(f);
+   linput_t *fin = open_linput(ftmp, false);
+   load_binary_file(ftmp, fin, 0, 0, 0, base, size);
+   close_linput(fin);
+#ifdef __NT__
+   DeleteFile(ftmp);   
+#else
+   unlink(ftmp);
+#endif
+}
+
+void createNewSegment(const char *name, uint32_t base, uint32_t size, uint32_t perms, uint32_t bitness) {
+   //create the new segment
+   segment_t s;
+   memset(&s, 0, sizeof(s));
+   s.startEA = base;
+   s.endEA = base + size;
+   s.align = saRelPara;
+   s.comb = scPub;
+   s.perm = (uint8_t)perms;
+   s.bitness = (uint8_t)bitness;
+   bool is_code = (perms & SEGPERM_EXEC) != 0;
+   if (is_code) {
+      s.type = SEG_CODE;
+   }
+   else {
+      s.type = SEG_DATA;
+   }
+   s.color = DEFCOLOR;
+   
+   msg("Creating segment with bitness %d and perms %d\n", s.bitness, s.perm);
+   if (add_segm_ex(&s, name, is_code ? "CODE" : "DATA", ADDSEG_QUIET | ADDSEG_NOSREG)) {
+      //zero out the newly created segment
+      zero_fill(base, size);
+   }
+}
 
 /*
  * native implementation of sk3wl_mmap.
  */
 static error_t idaapi idc_mmap(idc_value_t *argv, idc_value_t *res) {
    res->vtype = VT_INT64;
-   res->num = 0;
+   res->i64 = -1;
    if (argv[0].vtype == VT_INT64 && argv[1].vtype == VT_LONG && argv[2].vtype == VT_LONG) {
       uint64_t base = (uint64_t)argv[0].i64;
       unsigned int sz = (unsigned int)argv[1].num;
-      unsigned int perms = (unsigned int)argv[2].num;
-      map_block *mb = uc->memmgr->mmap(base, sz, perms);
-      res->i64 = mb->guest;
-   }
-   else {
-      res->i64 = -1;
+      unsigned int perms = (unsigned int)argv[2].num & SEGPERM_MAXVAL;
+      if (uc->map_mem_zero(base, base + sz, ida_to_uc_perms_map[perms])) {
+         char buf[32];
+         qstring seg_name = "mmap_";
+         map_block *mb = uc->memmgr->find_block(base);
+         snprintf(buf, sizeof(buf), "%llx", mb->guest);
+         seg_name += buf;
+         uint32_t bitness = 1;  //default to 32
+         if (uc->debug_mode & UC_MODE_16) {
+            bitness = 0;
+         }
+         else if (uc->debug_mode & UC_MODE_64) {
+            bitness = 2;
+         }
+         createNewSegment(seg_name.c_str(), base, sz, perms, bitness);
+         res->i64 = mb->guest;
+      }
    }
    return eOk;
 }
@@ -81,8 +174,8 @@ static error_t idaapi idc_munmap(idc_value_t *argv, idc_value_t *res) {
  * Register new IDC functions for use with the debugger
  */
 void register_funcs(sk3wldbg *_uc) {
-   static const char idc_long_long[] = { VT_LONG, VT_LONG, 0 };
-   static const char idc_long_long_long[] = { VT_LONG, VT_LONG, VT_LONG, 0 };
+   static const char idc_long_long[] = { VT_INT64, VT_LONG, 0 };
+   static const char idc_long_long_long[] = { VT_INT64, VT_LONG, VT_LONG, 0 };
    uc = _uc;
    set_idc_func_ex("sk3wl_mmap", idc_mmap, idc_long_long_long, EXTFUN_BASE);
    set_idc_func_ex("sk3wl_munmap", idc_munmap, idc_long_long, EXTFUN_BASE);

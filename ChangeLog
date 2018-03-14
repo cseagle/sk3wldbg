@@ -1,4 +1,12 @@
 * 03/13/18
+  Debugger installs two idc functions:
+     int64 sk3wl_mmap(int64 base, long size, int perms) where perms are a combination of:
+         #define SEGPERM_EXEC  1         ///< Execute
+         #define SEGPERM_WRITE 2         ///< Write
+         #define SEGPERM_READ  4         ///< Read
+     void sk3wl_munmap(int64 base, long size)
+     sk3wl_mmap may be used to map new regions of memory into an emulated unicorn process
+* 03/13/18
   Update to build for IDA 7.1
 * 10/2/17
   Update to build for IDA 7.0

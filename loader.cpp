@@ -21,6 +21,7 @@
 #include <ida.hpp>
 #include <llong.hpp>
 #include <nalt.hpp>
+#include <segment.hpp>
 
 struct Elf32_Ehdr {
    uint8_t  e_ident[16];
@@ -91,14 +92,30 @@ struct Elf64_Phdr {
   uint64_t   p_align;                /* Segment alignment */
 };
 
-static unsigned int ida_to_uc_perms_map[] = {
+/*    Unicorn perms                    IDA perms
+0     UC_PROT_NONE                     0
+1     UC_PROT_READ                     SEGPERM_EXEC
+2     UC_PROT_WRITE                    SEGPERM_WRITE
+3     UC_PROT_WRITE | UC_PROT_READ     SEGPERM_WRITE | SEGPERM_EXEC
+4     UC_PROT_EXEC                     SEGPERM_READ
+5     UC_PROT_EXEC | UC_PROT_READ      SEGPERM_READ | SEGPERM_EXEC
+6     UC_PROT_EXEC | UC_PROT_WRITE     SEGPERM_READ | SEGPERM_WRITE
+7     UC_PROT_ALL                      SEGPERM_READ | SEGPERM_WRITE | SEGPERM_EXEC
+*/
+
+unsigned int ida_to_uc_perms_map[] = {
    UC_PROT_NONE, UC_PROT_EXEC, UC_PROT_WRITE, UC_PROT_EXEC | UC_PROT_WRITE,
    UC_PROT_READ, UC_PROT_EXEC | UC_PROT_READ, UC_PROT_READ | UC_PROT_WRITE, UC_PROT_ALL
 };
 
-static unsigned int ida_to_uc_perms_map_win[] = {
+unsigned int ida_to_uc_perms_map_win[] = {
    UC_PROT_NONE, UC_PROT_EXEC, UC_PROT_READ, UC_PROT_EXEC | UC_PROT_READ,
    UC_PROT_WRITE, UC_PROT_EXEC | UC_PROT_WRITE, UC_PROT_READ | UC_PROT_WRITE, UC_PROT_ALL
+};
+
+unsigned int uc_to_ida_perms_map[] = {
+   0, SEGPERM_READ, SEGPERM_WRITE, SEGPERM_READ | SEGPERM_WRITE,
+   SEGPERM_EXEC, SEGPERM_EXEC | SEGPERM_READ, SEGPERM_EXEC | SEGPERM_WRITE, SEGPERM_EXEC | SEGPERM_WRITE | SEGPERM_READ
 };
 
 bool loadPE64(sk3wldbg *uc, void *img, size_t /*sz*/, const char * /*args*/) {

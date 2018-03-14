@@ -28,4 +28,8 @@ bool loadPE32(sk3wldbg *uc, void *img, size_t sz, const char *args);
 bool loadElf64(sk3wldbg *uc, void *img, size_t sz, const char *args);
 bool loadElf32(sk3wldbg *uc, void *img, size_t sz, const char *args);
 
+extern unsigned int ida_to_uc_perms_map[];
+extern unsigned int ida_to_uc_perms_map_win[];
+extern unsigned int uc_to_ida_perms_map[];
+
 #endif
