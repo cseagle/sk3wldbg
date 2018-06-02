@@ -80,5 +80,11 @@
     <ClInclude Include="idc_funcs.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="elf_local.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="pe_local.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

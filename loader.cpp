@@ -23,74 +23,8 @@
 #include <nalt.hpp>
 #include <segment.hpp>
 
-struct Elf32_Ehdr {
-   uint8_t  e_ident[16];
-#define ELF_IDENT  "\177ELF\x01\x01\x01"
-#define EI_DATA 5           // endian-ness   1 == little-endian, 2 == big-endian
-   uint16_t e_type;         /* Must be 2 for executable */
-   uint16_t e_machine;      /* Must be 3 for i386 */
-   uint32_t e_version;      /* Must be 1 */
-   uint32_t e_entry;        /* Virtual address entry point */
-   uint32_t e_phoff;        /* Program Header offset */
-   uint32_t e_shoff;        /* Section Header offset */
-   uint32_t e_flags;        /* Must be 0 */
-   uint16_t e_ehsize;       /* ELF header's size */
-   uint16_t e_phentsize;    /* Program header entry size */
-   uint16_t e_phnum;        /* # program header entries */
-   uint16_t e_shentsize;    /* Section header entry size */
-   uint16_t e_shnum;        /* # section header entries */
-   uint16_t e_shstrndx;     /* sect header # of str table */
-};
-
-struct Elf32_Phdr {
-   uint32_t        p_type;         /* Section type */
-
-#define PT_LOAD      1
-#define PT_LOOS      0x60000000
-#define PT_HIOS      0x6fffffff
-#define PT_LOPROC    0x70000000
-#define PT_HIPROC    0x7fffffff
-#define PT_GNU_STACK (PT_LOOS + 0x474e551)
-
-   uint32_t        p_offset;       /* Offset into the file */
-   uint32_t        p_vaddr;        /* Virtual program address */
-   uint32_t        p_paddr;        /* Set to zero */
-   uint32_t        p_filesz;       /* Section bytes in file */
-   uint32_t        p_memsz;        /* Section bytes in memory */
-   uint32_t        p_flags;        /* section flags */
-#define PF_X        (1<<0)          /* Mapped executable */
-#define PF_W        (1<<1)          /* Mapped writable */
-#define PF_R        (1<<2)          /* Mapped readable */
-   uint32_t        p_align;        /* Only used by core dumps */
-};
-
-struct Elf64_Ehdr {
-  uint8_t    e_ident[16];     /* Magic number and other info */
-  uint16_t   e_type;                 /* Object file type */
-  uint16_t   e_machine;              /* Architecture */
-  uint32_t   e_version;              /* Object file version */
-  uint64_t   e_entry;                /* Entry point virtual address */
-  uint64_t   e_phoff;                /* Program header table file offset */
-  uint64_t   e_shoff;                /* Section header table file offset */
-  uint32_t   e_flags;                /* Processor-specific flags */
-  uint16_t   e_ehsize;               /* ELF header size in bytes */
-  uint16_t   e_phentsize;            /* Program header table entry size */
-  uint16_t   e_phnum;                /* Program header table entry count */
-  uint16_t   e_shentsize;            /* Section header table entry size */
-  uint16_t   e_shnum;                /* Section header table entry count */
-  uint16_t   e_shstrndx;             /* Section header string table index */
-};
-
-struct Elf64_Phdr {
-  uint32_t   p_type;                 /* Segment type */
-  uint32_t   p_flags;                /* Segment flags */
-  uint64_t   p_offset;               /* Segment file offset */
-  uint64_t   p_vaddr;                /* Segment virtual address */
-  uint64_t   p_paddr;                /* Segment physical address */
-  uint64_t   p_filesz;               /* Segment size in file */
-  uint64_t   p_memsz;                /* Segment size in memory */
-  uint64_t   p_align;                /* Segment alignment */
-};
+#include "elf_local.h"
+#include "pe_local.h"
 
 /*    Unicorn perms                    IDA perms
 0     UC_PROT_NONE                     0
@@ -103,53 +37,62 @@ struct Elf64_Phdr {
 7     UC_PROT_ALL                      SEGPERM_READ | SEGPERM_WRITE | SEGPERM_EXEC
 */
 
-unsigned int ida_to_uc_perms_map[] = {
+uint32_t ida_to_uc_perms_map[] = {
    UC_PROT_NONE, UC_PROT_EXEC, UC_PROT_WRITE, UC_PROT_EXEC | UC_PROT_WRITE,
    UC_PROT_READ, UC_PROT_EXEC | UC_PROT_READ, UC_PROT_READ | UC_PROT_WRITE, UC_PROT_ALL
 };
 
-unsigned int ida_to_uc_perms_map_win[] = {
+uint32_t ida_to_uc_perms_map_win[] = {
    UC_PROT_NONE, UC_PROT_EXEC, UC_PROT_READ, UC_PROT_EXEC | UC_PROT_READ,
    UC_PROT_WRITE, UC_PROT_EXEC | UC_PROT_WRITE, UC_PROT_READ | UC_PROT_WRITE, UC_PROT_ALL
 };
 
-unsigned int uc_to_ida_perms_map[] = {
+uint32_t uc_to_ida_perms_map[] = {
    0, SEGPERM_READ, SEGPERM_WRITE, SEGPERM_READ | SEGPERM_WRITE,
    SEGPERM_EXEC, SEGPERM_EXEC | SEGPERM_READ, SEGPERM_EXEC | SEGPERM_WRITE, SEGPERM_EXEC | SEGPERM_WRITE | SEGPERM_READ
 };
 
+void load_pe_sections(sk3wldbg *uc, void *img, ea_t base, size_t hdr_sz, IMAGE_SECTION_HEADER_ *sections, uint32_t nsect) {
+   //load the PE headers
+   void *buf = uc->map_mem_zero(base, base + hdr_sz, UC_PROT_READ | UC_PROT_WRITE);
+   msg("Copying bytes 0x%x:0x%x into block\n", 0, hdr_sz);
+   memcpy(buf, img, hdr_sz);
+
+   //Now load the sections
+   for (uint32_t s = 0; s < nsect; s++) {
+      ea_t vaddr = base + sections[s].VirtualAddress;
+      uint32_t perms = sections[s].Characteristics >> 29;
+      uint32_t file_off = sections[s].PointerToRawData;
+      uint32_t filesz = sections[s].SizeOfRawData;
+      void *block = uc->map_mem_zero(vaddr, vaddr + sections[s].VirtualSize, ida_to_uc_perms_map_win[perms]);
+      if (filesz) {
+         msg("Copying bytes 0x%x:0x%x into block\n", file_off, file_off + filesz);
+         memcpy(block, file_off + (char*)img, filesz);
+//         uc_err err = uc_mem_write(uc->uc, vaddr, file_off + (char*)img, filesz);
+      }
+   }
+}
+
 bool loadPE64(sk3wldbg *uc, void *img, size_t /*sz*/, const char * /*args*/) {
-   if (memcmp(img, "MZ", 2) != 0) {
+   IMAGE_DOS_HEADER_ *dos = (IMAGE_DOS_HEADER_*)img;
+   if (dos->e_magic != DOS_MAGIC) {
       msg("bad MZ magic\n");
       return false;
    }
-   unsigned char *pe = (unsigned char*)(*(int*)(0x3c + (char*)img) + (char*)img);
-   if (memcmp(pe, "PE\x00\x00", 4) != 0) {
+   IMAGE_NT_HEADERS64_ *pe = (IMAGE_NT_HEADERS64_*)(dos->e_lfanew + (char*)dos);
+   if (pe->Signature != PE_MAGIC) {
       msg("bad PE signature\n");
       return false;
    }
    uc->init_memmgr(0x130000 - 0x100000, 0x80000000);
-   unsigned int nsect = *(unsigned short*)(pe + 6);
-   unsigned int ohdr = *(unsigned short*)(pe + 20);
-   ea_t image_base = *(ea_t*)(pe + 24 + 24);
-   unsigned char *sections = pe + 24 + ohdr;
-   for (unsigned int s = 0; s < nsect; s++) {
-      ea_t vaddr = image_base + *(unsigned int*)(sections + 12);
-      unsigned int vsize = *(unsigned int*)(sections + 8);
-      unsigned int perms = (*(unsigned int*)(sections + 36)) >> 29;
-      unsigned int file_off = *(unsigned int*)(sections + 20);
-      unsigned int filesz = *(unsigned int*)(sections + 16);
-      void *buf = uc->map_mem_zero(vaddr, vaddr + vsize, ida_to_uc_perms_map_win[perms]);
-      if (filesz) {
-         msg("Copying bytes 0x%x:0x%x into block\n", file_off, file_off + filesz);
-         memcpy(buf, file_off + (char*)img, filesz);
-//         uc_err err = uc_mem_write(uc->uc, vaddr, file_off + (char*)img, filesz);
-      }
-      sections += 40;
-   }
+   IMAGE_SECTION_HEADER_ *sections = (IMAGE_SECTION_HEADER_*)(sizeof(pe->Signature) + sizeof(IMAGE_FILE_HEADER_) + 
+                                                              pe->FileHeader.SizeOfOptionalHeader +(char*)pe);
+
+   load_pe_sections(uc, img, pe->OptionalHeader.ImageBase, pe->OptionalHeader.SizeOfHeaders,
+                    sections, pe->FileHeader.NumberOfSections);
 
    //PE stack
-   unsigned int stack_top = 0x130000;
+   uint32_t stack_top = 0x130000;
    uc->map_mem_zero(stack_top - 0x100000, stack_top, UC_PROT_READ | UC_PROT_WRITE | UC_PROT_EXEC);
 
    stack_top -= 16;
@@ -159,37 +102,25 @@ bool loadPE64(sk3wldbg *uc, void *img, size_t /*sz*/, const char * /*args*/) {
 }
 
 bool loadPE32(sk3wldbg *uc, void *img, size_t /*sz*/, const char * /*args*/) {
-   if (memcmp(img, "MZ", 2) != 0) {
+   IMAGE_DOS_HEADER_ *dos = (IMAGE_DOS_HEADER_*)img;
+   if (dos->e_magic != DOS_MAGIC) {
       msg("bad MZ magic\n");
       return false;
    }
-   unsigned char *pe = (unsigned char*)(*(int*)(0x3c + (char*)img) + (char*)img);
-   if (memcmp(pe, "PE\x00\x00", 4) != 0) {
+   IMAGE_NT_HEADERS32_ *pe = (IMAGE_NT_HEADERS32_*)(dos->e_lfanew + (char*)dos);
+   if (pe->Signature != PE_MAGIC) {
       msg("bad PE signature\n");
       return false;
    }
    uc->init_memmgr(0x130000 - 0x100000, 0x80000000);
-   unsigned int nsect = *(unsigned short*)(pe + 6);
-   unsigned int ohdr = *(unsigned short*)(pe + 20);
-   unsigned int image_base = *(unsigned int*)(pe + 24 + 28);
-   unsigned char *sections = pe + 24 + ohdr;
-   for (unsigned int s = 0; s < nsect; s++) {
-      unsigned int vaddr = image_base + *(unsigned int*)(sections + 12);
-      unsigned int vsize = *(unsigned int*)(sections + 8);
-      unsigned int perms = (*(unsigned int*)(sections + 36)) >> 29;
-      unsigned int file_off = *(unsigned int*)(sections + 20);
-      unsigned int filesz = *(unsigned int*)(sections + 16);
-      void *block = uc->map_mem_zero(vaddr, vaddr + vsize, ida_to_uc_perms_map_win[perms]);
-      if (filesz) {
-         msg("Copying bytes 0x%x:0x%x into block\n", file_off, file_off + filesz);
-         memcpy(block, file_off + (char*)img, filesz);
-//         uc_err err = uc_mem_write(uc->uc, vaddr, file_off + (char*)img, filesz);
-      }
-      sections += 40;
-   }
+   IMAGE_SECTION_HEADER_ *sections = (IMAGE_SECTION_HEADER_*)(sizeof(pe->Signature) + sizeof(IMAGE_FILE_HEADER_) + 
+                                                              pe->FileHeader.SizeOfOptionalHeader +(char*)pe);
+
+   load_pe_sections(uc, img, pe->OptionalHeader.ImageBase, pe->OptionalHeader.SizeOfHeaders,
+                    sections, pe->FileHeader.NumberOfSections);
 
    //PE stack
-   unsigned int stack_top = 0x130000;
+   uint32_t stack_top = 0x130000;
    uc->map_mem_zero(stack_top - 0x100000, stack_top, UC_PROT_READ | UC_PROT_WRITE | UC_PROT_EXEC);
 
    stack_top -= 16;

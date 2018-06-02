@@ -97,7 +97,7 @@ void zero_fill(ea_t base, size_t size) {
 #endif
 }
 
-void createNewSegment(const char *name, uint32_t base, uint32_t size, uint32_t perms, uint32_t bitness) {
+void createNewSegment(const char *name, ea_t base, uint32_t size, uint32_t perms, uint32_t bitness) {
    //create the new segment
    segment_t s;
    memset(&s, 0, sizeof(s));
@@ -146,7 +146,7 @@ static error_t idaapi idc_mmap(idc_value_t *argv, idc_value_t *res) {
          else if (uc->debug_mode & UC_MODE_64) {
             bitness = 2;
          }
-         createNewSegment(seg_name.c_str(), base, sz, perms, bitness);
+         createNewSegment(seg_name.c_str(), (ea_t)base, sz, perms, bitness);
          res->i64 = mb->guest;
       }
    }

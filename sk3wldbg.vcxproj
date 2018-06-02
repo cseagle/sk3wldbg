@@ -303,9 +303,11 @@
     <ClCompile Include="sk3wldbg_x86.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="elf_local.h" />
     <ClInclude Include="idc_funcs.h" />
     <ClInclude Include="loader.h" />
     <ClInclude Include="mem_mgr.h" />
+    <ClInclude Include="pe_local.h" />
     <ClInclude Include="sk3wldbg.h" />
     <ClInclude Include="sk3wldbg_arm.h" />
     <ClInclude Include="sk3wldbg_m68k.h" />
