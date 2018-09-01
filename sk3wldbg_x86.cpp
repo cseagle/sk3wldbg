@@ -53,9 +53,39 @@ enum X86RegClass {
    X86_XMM = 16
 };
 
+static const char *flag_bits_16[32] = {
+   "CF", NULL, "PF", NULL, "AF", NULL, "ZF", "SF", "TF", "IF", "DF", "OF"
+};
+
 static const char *flag_bits[32] = {
    "CF", NULL, "PF", NULL, "AF", NULL, "ZF", "SF", "TF", "IF", "DF", "OF",
    "IOPL", "IOPL", "NT", NULL, "RF", "VM", "AC", "VIF", "VIP", "ID"
+};
+
+static struct register_info_t x86_16_regs[] = {
+   {"EAX", REGISTER_ADDRESS, X86_GENERAL, dt_dword, NULL, 0},
+   {"ECX", REGISTER_ADDRESS, X86_GENERAL, dt_dword, NULL, 0},
+   {"EDX", REGISTER_ADDRESS, X86_GENERAL, dt_dword, NULL, 0},
+   {"EBX", REGISTER_ADDRESS, X86_GENERAL, dt_dword, NULL, 0},
+   {"ESP", REGISTER_SP | REGISTER_ADDRESS, X86_GENERAL, dt_dword, NULL, 0},
+   {"EBP", REGISTER_FP | REGISTER_ADDRESS, X86_GENERAL, dt_dword, NULL, 0},
+   {"ESI", REGISTER_ADDRESS, X86_GENERAL, dt_dword, NULL, 0},
+   {"EDI", REGISTER_ADDRESS, X86_GENERAL, dt_dword, NULL, 0},
+   {"EIP", REGISTER_IP | REGISTER_ADDRESS, X86_GENERAL, dt_dword, NULL, 0},
+   {"EFL", 0, X86_GENERAL, dt_dword, flag_bits, 0xdd5},
+   {"CS", REGISTER_CS, X86_SEGMENT, dt_word, NULL, 0},
+   {"DS", 0, X86_SEGMENT, dt_word, NULL, 0},
+   {"SS", REGISTER_SS, X86_SEGMENT, dt_word, NULL, 0},
+   {"ES", 0, X86_SEGMENT, dt_word, NULL, 0},
+   {"FS", 0, X86_SEGMENT, dt_word, NULL, 0},
+   {"GS", 0, X86_SEGMENT, dt_word, NULL, 0},
+};
+
+static int32_t x86_16_reg_map[] = {
+   UC_X86_REG_EAX, UC_X86_REG_ECX, UC_X86_REG_EDX, UC_X86_REG_EBX,
+   UC_X86_REG_ESP, UC_X86_REG_EBP, UC_X86_REG_ESI, UC_X86_REG_EDI,
+   UC_X86_REG_EIP, UC_X86_REG_EFLAGS, UC_X86_REG_CS, UC_X86_REG_DS,
+   UC_X86_REG_SS, UC_X86_REG_ES, UC_X86_REG_FS, UC_X86_REG_GS
 };
 
 static struct register_info_t x86_regs[] = {
@@ -119,6 +149,25 @@ static int32_t x64_reg_map[] = {
    UC_X86_REG_RIP, UC_X86_REG_EFLAGS, UC_X86_REG_CS, UC_X86_REG_DS,
    UC_X86_REG_SS, UC_X86_REG_ES, UC_X86_REG_FS, UC_X86_REG_GS
 };
+
+sk3wldbg_x86_16::sk3wldbg_x86_16() : sk3wldbg("metapc", UC_ARCH_X86, UC_MODE_16) {
+   //reset any overridden function pointers and setup register name fields
+   register_classes = x86_register_classes;
+   register_classes_default = X86_GENERAL;  ///< Mask of default printed register classes
+   _registers = x86_16_regs;                ///< Array of registers. Use registers() to access it
+   registers_size = qnumber(x86_16_regs);   ///< Number of registers
+   reg_map = x86_16_reg_map;
+   bpt_bytes = (const uchar *)"\xcc";  ///< Array of bytes for a breakpoint instruction
+   bpt_size = 1;                    ///< Size of this array
+
+}
+
+bool sk3wldbg_x86_16::save_ret_addr(uint64_t retaddr) {
+   uint64_t new_sp = get_sp() - sizeof(uint16_t);
+   uc_mem_write(uc, new_sp, &retaddr, sizeof(uint64_t));
+   set_sp(new_sp);
+   return true;
+}
 
 sk3wldbg_x86_32::sk3wldbg_x86_32() : sk3wldbg("metapc", UC_ARCH_X86, UC_MODE_32) {
    //reset any overridden function pointers and setup register name fields
@@ -241,7 +290,6 @@ void sk3wldbg_x86_32::install_initial_hooks() {
 
 sk3wldbg_x86_64::sk3wldbg_x86_64() : sk3wldbg("metapc", UC_ARCH_X86, UC_MODE_64) {
    //reset any overridden function pointers and setup register name fields
-
    register_classes = x86_register_classes;
    register_classes_default = X86_GENERAL;  ///< Mask of default printed register classes
    _registers = x64_regs;                ///< Array of registers. Use registers() to access it

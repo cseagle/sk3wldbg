@@ -78,6 +78,12 @@
 #include "sk3wldbg.h"
 #include "loader.h"
 
+#ifdef DEBUG
+#undef DEBUG 
+#else
+#undef DEBUG 
+#endif
+
 static ssize_t idaapi idd_hook(void * /* ud */, int notification_code, va_list va);
 
 struct safe_msg : public exec_request_t {
@@ -97,6 +103,12 @@ void do_safe_msg(const char *msg) {
    qstring m(msg);
    safe_msg req(m);
    execute_sync(req, MFF_FAST);
+}
+
+qstring *get_process_name() {
+   char buf[1024];
+   ssize_t sz = get_root_filename(buf, sizeof(buf));
+   return new qstring(buf);
 }
 
 /// Initialize debugger.
@@ -232,7 +244,11 @@ int idaapi print_pc::execute() {
 
 int idaapi processRunner(void *unicorn) {
    sk3wldbg *uc = (sk3wldbg*)unicorn;
-   uc->start(get_screen_ea());
+   uint64_t pc = uc->get_pc();
+   if (pc == 0) {
+      pc = get_screen_ea();
+   }
+   uc->start(pc);
    //unicorn start has returned, process has ended, so tell IDA to detach
    debug_event_t detach;
 #if IDA_SDK_VERSION >= 710
@@ -265,7 +281,9 @@ int idaapi uni_get_processes(procinfo_vec_t *procs) {
 #endif
    sk3wldbg *uc = (sk3wldbg*)dbg;
    process_info_t info;
-   info.name = "Unicorn Process";
+   qstring *procname = get_process_name();
+   info.name = *procname;
+   delete procname;
    info.pid = uc->the_process;
    procs->push_back(info);
    return 1;
@@ -285,7 +303,9 @@ int idaapi uni_process_get_info(int n, process_info_t *info) {
    msg("uni_process_get_info called\n");
 #endif
    sk3wldbg *uc = (sk3wldbg*)dbg;
-   qstrncpy(info->name, "Unicorn Process", sizeof(info->name));
+   qstring *procname = get_process_name();
+   qstrncpy(info->name, procname->c_str(), sizeof(info->name));
+   delete procname;
    info->pid = uc->the_process;
    return 1;
 }
@@ -402,14 +422,20 @@ int idaapi uni_start_process(const char * /*path*/,
                msg("fread fail\n");
             }
             else {
-               loaded = loadImage(uc, img, sz, args);
+               loaded = loadImage(uc, img, sz, args, init_pc);
             }
             free(img);
          }
       }
       fclose(bin);
    }
-   if (uc->get_sp() == 0) {
+   void *buf16 = NULL; //memory pointer
+   if (uc->debug_mode == UC_MODE_16) {
+      //just map a megabyte
+      uc->init_memmgr(0, 0x100000);
+      buf16 = uc->map_mem_zero(0, 0x100000, UC_PROT_READ | UC_PROT_WRITE | UC_PROT_EXEC);
+   }
+   else if (uc->get_sp() == 0) {
       //need a stack too, just sling it somewhere
       //add it to uc->memory
       unsigned int stack_top = 0xffffe000;
@@ -427,17 +453,26 @@ int idaapi uni_start_process(const char * /*path*/,
       //arch specific unicorns also need to set initial register state
       segment_t *seg;
       for (seg = get_first_seg(); seg != NULL; seg = get_next_seg(seg->startEA)) {
+         void *buf;
          ssize_t exact = (ssize_t)(seg->endEA - seg->startEA);
-         void *buf = uc->map_mem_zero(seg->startEA, seg->endEA, ida_to_uc_perms_map[seg->perm]);
+         if (uc->debug_mode == UC_MODE_16) {
+            buf = seg->startEA + (char*)buf16;
+         }
+         else {
+            buf = uc->map_mem_zero(seg->startEA, seg->endEA, ida_to_uc_perms_map[seg->perm]);
+         }
          get_many_bytes(seg->startEA, buf, exact);
       }
+
+      //need other ways to set PC, from start, user specified
+      uc->set_pc(init_pc);
+
    }
 
    //init registers
+   //TODO: each architecture subclass should have its own register state initialization
+   
    //register unicorn hooks
-
-   //need other ways to set PC, from start, user specified
-   uc->set_pc(init_pc);
 
 #ifdef DEBUG
    ipc = (ea_t)uc->get_pc();
@@ -461,15 +496,17 @@ int idaapi uni_start_process(const char * /*path*/,
    }
 
    debug_event_t start;
+   qstring *procname = get_process_name();
 #if IDA_SDK_VERSION >= 710
    start.set_eid(PROCESS_START);
    modinfo_t &mod = start.modinfo();
-   mod.name = "Unicorn Process";
+   mod.name = *procname;
 #else
    start.eid = PROCESS_START;
    module_info_t &mod = start.modinfo;
-   qstrncpy(mod.name, "Unicorn Process", sizeof(start.modinfo.name));
+   qstrncpy(mod.name, procname->c_str(), sizeof(start.modinfo.name));
 #endif
+   delete procname;
    start.pid = uc->the_process;
    start.tid = uc->the_threads.front();
    start.ea = BADADDR;
@@ -1985,7 +2022,7 @@ void generic_code_hook(uc_engine *uc, uint64_t address, uint32_t size, sk3wldbg 
    bool stopping = false;
 #ifdef DEBUG
    char buf[1204];
-   qsnprintf(buf, sizeof(buf), "code hit at: 0x%llx, expecting to exec 0x%x\n", address, get_long((ea_t)address));
+   qsnprintf(buf, sizeof(buf), "code hit at: 0x%llx, expecting to exec 0x%x\n", address, get_dword((ea_t)address));
    do_safe_msg(buf);
    uint32_t opc;
    uc_mem_read(dbg->uc, address, &opc, sizeof(opc));

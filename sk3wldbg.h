@@ -20,7 +20,9 @@
 #ifndef __UNICORN_H
 #define __UNICORN_H
 
+#ifndef USE_DANGEROUS_FUNCTIONS
 #define USE_DANGEROUS_FUNCTIONS
+#endif
 
 #ifdef __NT__
 
@@ -236,6 +238,7 @@ struct mem_map_action_handler : public action_handler_t {
 #define do_data_ex(a, d, s, t) create_data(a, d, s, t)
 #define doDwrd(a, l) create_dword(a, l)
 #define doStruct(a, l, t) create_struct(a, l, t)
+#define get_long(a) get_dword(a)
 
 #define dwrdflag dword_flag
 
@@ -265,6 +268,7 @@ struct mem_map_action_handler : public action_handler_t {
 #define set_func_end func_setend
 
 #define get_sreg(a, r) get_segreg(a, r)
+#define get_dword(a) get_long(a)
 
 #define ask_form AskUsingForm_c
 

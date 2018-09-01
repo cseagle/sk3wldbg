@@ -19,6 +19,12 @@
 
 #include "sk3wldbg.h"
 
+struct sk3wldbg_x86_16 : public sk3wldbg {
+   sk3wldbg_x86_16();
+   bool save_ret_addr(uint64_t retaddr);
+   bool call_changes_sp() {return true;};
+};
+
 struct sk3wldbg_x86_32 : public sk3wldbg {
    sk3wldbg_x86_32();   
    bool save_ret_addr(uint64_t retaddr);

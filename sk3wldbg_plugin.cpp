@@ -173,16 +173,19 @@ int idaapi plugin_init(void) {
       debug_mode = UC_MODE_32;
    }
    else {
-      msg("sk3wldbg: can't detect file bitness\n");
-      return PLUGIN_SKIP;
+      //let's assume it's 16 bit code
+      debug_mode = UC_MODE_16;
    }
    switch (ph.id) {
       case PLFM_386:
          if (debug_mode == UC_MODE_32) {
             sdbg = new sk3wldbg_x86_32();
          }
-         else {
+         else if (debug_mode == UC_MODE_64) {
             sdbg = new sk3wldbg_x86_64();
+         }
+         else if (debug_mode == UC_MODE_16) {
+            sdbg = new sk3wldbg_x86_16();
          }
          break;
       case PLFM_68K:

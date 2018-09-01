@@ -22,11 +22,11 @@
 
 #include "sk3wldbg.h"
 
-bool loadImage(sk3wldbg *uc, void *img, size_t sz, const char *args);
-bool loadPE64(sk3wldbg *uc, void *img, size_t sz, const char *args);
-bool loadPE32(sk3wldbg *uc, void *img, size_t sz, const char *args);
-bool loadElf64(sk3wldbg *uc, void *img, size_t sz, const char *args);
-bool loadElf32(sk3wldbg *uc, void *img, size_t sz, const char *args);
+bool loadImage(sk3wldbg *uc, void *img, size_t sz, const char *args, uint64_t init_pc);
+bool loadPE64(sk3wldbg *uc, void *img, size_t sz, const char *args, uint64_t init_pc);
+bool loadPE32(sk3wldbg *uc, void *img, size_t sz, const char *args, uint64_t init_pc);
+bool loadElf64(sk3wldbg *uc, void *img, size_t sz, const char *args, uint64_t init_pc);
+bool loadElf32(sk3wldbg *uc, void *img, size_t sz, const char *args, uint64_t init_pc);
 
 extern unsigned int ida_to_uc_perms_map[];
 extern unsigned int ida_to_uc_perms_map_win[];
