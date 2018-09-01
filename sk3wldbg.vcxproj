@@ -304,6 +304,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="elf_local.h" />
+    <ClInclude Include="heap.h" />
     <ClInclude Include="idc_funcs.h" />
     <ClInclude Include="loader.h" />
     <ClInclude Include="mem_mgr.h" />
