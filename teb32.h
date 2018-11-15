@@ -485,7 +485,6 @@ struct PEB_LDR_DATA_
 struct LDR_DATA_TABLE_ENTRY_ {
    LIST_ENTRY_ InLoadOrderLinks;
    LIST_ENTRY_ InMemoryOrderLinks;
-   LIST_ENTRY_ InInitializationOrderLinks;
    union {
        LIST_ENTRY_ InInitializationOrderLinks;
        LIST_ENTRY_ InProgressLinks;

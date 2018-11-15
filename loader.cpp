@@ -173,8 +173,12 @@ qstring *make_env(const char *env[], const char *userName, const char *hostName,
    return res;
 }
 
+#define BITS_16 0
+#define BITS_32 1
+#define BITS_64 2
+
 //VERY basic descriptor init function, sets many fields to user space sane defaults
-static void init_descriptor(struct SegmentDescriptor *desc, uint32_t base, uint32_t limit, uint8_t is_code) {
+static void init_descriptor(struct SegmentDescriptor *desc, uint32_t base, uint32_t limit, uint8_t is_code, int bitness = 1) {
    desc->desc = 0;  //clear the descriptor
    desc->base0 = base & 0xffff;
    desc->base1 = (base >> 16) & 0xff;
@@ -190,7 +194,17 @@ static void init_descriptor(struct SegmentDescriptor *desc, uint32_t base, uint3
    //some sane defaults
    desc->dpl = 3;
    desc->present = 1;
-   desc->db = 1;   //32 bit
+   if (is_code) {
+      if (bitness == 1) {
+         desc->db = 1;   //32 bit
+      }
+      else if (bitness == 2) {
+         desc->is_64_code = 1;   //64 bit
+      }
+   }
+   else {
+      desc->db = 1;   //32 bit
+   }
    desc->type = is_code ? 0xb : 3;
    desc->system = 1;  //code or data
 }
@@ -213,7 +227,8 @@ void build_sane_gdt(sk3wldbg *uc, uint32_t fs_base, uint64_t init_pc, uint64_t u
 
    int cpl0_cs = 0x10; //ring 0 cs we will iret from
    int cpl0_ss = 0x18; //ring 0 ss we will iret from
-   int user_cs = 0x23; //ring 3 cs we will iret to
+   int user_cs_32 = 0x23; //32-bit ring 3 cs we will iret to
+   int user_cs_64 = 0x33; //64-bit ring 3 cs
    int user_ss = 0x2b; //ring 3 ss we will iret to, need this because we can't set a ring 3 ss directly in unicorn
    int r_ds = 0x2b;
    int r_es = 0x2b;
@@ -233,7 +248,7 @@ void build_sane_gdt(sk3wldbg *uc, uint32_t fs_base, uint64_t init_pc, uint64_t u
 
    //setup stack for iret
    *(uint32_t*)(block + 0xf00) = (uint32_t)init_pc;   //initial ring 3 eip
-   *(uint32_t*)(block + 0xf04) = user_cs;             //rpl 3 cs
+   *(uint32_t*)(block + 0xf04) = user_cs_32;             //rpl 3 cs
    *(uint32_t*)(block + 0xf08) = (0 << 12) | 0x202;   //iitial eflags, w/ IOPL 0
    *(uint32_t*)(block + 0xf0c) = (uint32_t)user_sp;   //initial ring 3 esp
    *(uint32_t*)(block + 0xf10) = user_ss;             //rpl 3 ss
@@ -249,7 +264,10 @@ void build_sane_gdt(sk3wldbg *uc, uint32_t fs_base, uint64_t init_pc, uint64_t u
    gdt[DESC_IDX(cpl0_cs)].dpl = 0;  //set descriptor privilege level
 
    //setup dpl 3 descriptor for eventual rpl 3 cs
-   init_descriptor(&gdt[DESC_IDX(user_cs)], 0, 0xfffff000, 1);  //code segment
+   init_descriptor(&gdt[DESC_IDX(user_cs_32)], 0, 0xfffff000, 1);  //code segment
+
+   //setup dpl 3 descriptor for 64-bit
+   init_descriptor(&gdt[DESC_IDX(user_cs_64)], 0, 0xfffff000, 1);  //code segment
 
    init_descriptor(&gdt[DESC_IDX(r_fs)], fs_base, 0xfff, 0);  //one page data segment simulate fs
 
@@ -322,7 +340,7 @@ bool loadPE64(sk3wldbg *uc, void *img, size_t /*sz*/, const char * /*args*/, uin
       msg("bad PE signature\n");
       return false;
    }
-   uc->init_memmgr(0x130000 - 0x100000, 0x80000000);
+   uc->init_memmgr(0x130000 - 0x100000, 0x800000000000ll);
    IMAGE_SECTION_HEADER_ *sections = (IMAGE_SECTION_HEADER_*)(sizeof(pe->Signature) + sizeof(IMAGE_FILE_HEADER_) +
                                                               pe->FileHeader.SizeOfOptionalHeader +(char*)pe);
 
