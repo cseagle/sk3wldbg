@@ -1,5 +1,8 @@
 /* Unicorn Emulator Engine */
-/* By Nguyen Anh Quynh <aquynh@gmail.com>, 2015 */
+/* By Nguyen Anh Quynh <aquynh@gmail.com>, 2015-2017 */
+/* This file is released under LGPL2.
+   See COPYING.LGPL2 in root directory for more details
+*/
 
 #ifndef UNICORN_ENGINE_H
 #define UNICORN_ENGINE_H
@@ -248,10 +251,12 @@ typedef enum uc_hook_type {
 // Hook type for all events of illegal memory access
 #define UC_HOOK_MEM_INVALID (UC_HOOK_MEM_UNMAPPED + UC_HOOK_MEM_PROT)
 // Hook type for all events of valid memory access
+// NOTE: UC_HOOK_MEM_READ is triggered before UC_HOOK_MEM_READ_PROT and UC_HOOK_MEM_READ_UNMAPPED, so
+//       this hook may technically trigger on some invalid reads. 
 #define UC_HOOK_MEM_VALID (UC_HOOK_MEM_READ + UC_HOOK_MEM_WRITE + UC_HOOK_MEM_FETCH)
 
 /*
-  Callback function for hooking memory (UC_MEM_READ, UC_MEM_WRITE & UC_MEM_FETCH)
+  Callback function for hooking memory (READ, WRITE & FETCH)
 
   @type: this memory is being READ, or WRITE
   @address: address where the code is being executed
@@ -263,8 +268,8 @@ typedef void (*uc_cb_hookmem_t)(uc_engine *uc, uc_mem_type type,
         uint64_t address, int size, int64_t value, void *user_data);
 
 /*
-  Callback function for handling invalid memory access events (UC_MEM_*_UNMAPPED and
-    UC_MEM_*PROT events)
+  Callback function for handling invalid memory access events (UNMAPPED and
+    PROT events)
 
   @type: this memory is being READ, or WRITE
   @address: address where the code is being executed
@@ -275,12 +280,15 @@ typedef void (*uc_cb_hookmem_t)(uc_engine *uc, uc_mem_type type,
   @return: return true to continue, or false to stop program (due to invalid memory).
            NOTE: returning true to continue execution will only work if if the accessed
            memory is made accessible with the correct permissions during the hook.
+           
            In the event of a UC_MEM_READ_UNMAPPED or UC_MEM_WRITE_UNMAPPED callback,
            the memory should be uc_mem_map()-ed with the correct permissions, and the
            instruction will then read or write to the address as it was supposed to.
+           
            In the event of a UC_MEM_FETCH_UNMAPPED callback, the memory can be mapped
-           in as executable, in which case execution will resume from the fetched address,
-           or the instruction pointer can be written to in order to resume execution elsewhere.
+           in as executable, in which case execution will resume from the fetched address.
+           The instruction pointer may be written to in order to change where execution resumes,
+           but the fetch must succeed if execution is to resume.
 */
 typedef bool (*uc_cb_eventmem_t)(uc_engine *uc, uc_mem_type type,
         uint64_t address, int size, int64_t value, void *user_data);
@@ -300,6 +308,7 @@ typedef enum uc_query_type {
     // Dynamically query current hardware mode.
     UC_QUERY_MODE = 1,
     UC_QUERY_PAGE_SIZE,
+    UC_QUERY_ARCH,
 } uc_query_type;
 
 // Opaque storage for CPU context, used with uc_context_*()
