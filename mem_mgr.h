@@ -24,6 +24,8 @@
 
 #include <unicorn/unicorn.h>
 
+#define SDB_MAP_FIXED 1
+
 struct map_block {
    void *host;
    uint64_t guest;
@@ -57,7 +59,7 @@ public:
    map_block *add_block(void *host, uint64_t guest, uint32_t length);
    map_block *find_block(uint64_t addr);
    void *to_host_ptr(uint64_t addr);
-   map_block *mmap(uint64_t addr, uint32_t length, uint32_t perms);
+   map_block *mmap(uint64_t addr, uint32_t length, uint32_t perms, uint32_t flags = 0);
    void mprotect(uint64_t addr, uint32_t length, uint32_t perms);
    void munmap(uint64_t addr, uint32_t length);
 };

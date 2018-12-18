@@ -42,12 +42,6 @@ static sk3wldbg *uc;
 #define snprintf _snprintf
 #endif
 
-void format_llx(uint64_t val, qstring &s) {
-   char buf[32];
-   snprintf(buf, sizeof(buf), "%llx", (uint64_t)val);
-   s = buf;
-}
-
 #if IDA_SDK_VERSION >= 700
 
 bool set_idc_func_ex(const char *name, idc_func_t *fp, const char *args, int extfunc_flags) {
@@ -100,7 +94,6 @@ void zero_fill(ea_t base, size_t size) {
 void createNewSegment(const char *name, ea_t base, uint32_t size, uint32_t perms, uint32_t bitness) {
    //create the new segment
    segment_t s;
-   memset(&s, 0, sizeof(s));
    s.startEA = base;
    s.endEA = base + size;
    s.align = saRelPara;
@@ -114,17 +107,21 @@ void createNewSegment(const char *name, ea_t base, uint32_t size, uint32_t perms
    else {
       s.type = SEG_DATA;
    }
-   s.color = DEFCOLOR;
+   s.flags = SFL_DEBUG;
    
-   msg("Creating segment with bitness %d and perms %d\n", s.bitness, s.perm);
+   msg("Creating segment %s with bitness %d and perms %d\n", name, s.bitness, s.perm);
    if (add_segm_ex(&s, name, is_code ? "CODE" : "DATA", ADDSEG_QUIET | ADDSEG_NOSREG)) {
       //zero out the newly created segment
       zero_fill(base, size);
+   }
+   else {
+      msg("createNewSegment failed\n");
    }
 }
 
 /*
  * native implementation of sk3wl_mmap.
+ * long sk3wl_mmap(long base, long size, lonf perms)
  */
 static error_t idaapi idc_mmap(idc_value_t *argv, idc_value_t *res) {
    res->vtype = VT_INT64;
@@ -134,11 +131,9 @@ static error_t idaapi idc_mmap(idc_value_t *argv, idc_value_t *res) {
       unsigned int sz = (unsigned int)argv[1].num;
       unsigned int perms = (unsigned int)argv[2].num & SEGPERM_MAXVAL;
       if (uc->map_mem_zero(base, base + sz, ida_to_uc_perms_map[perms])) {
-         char buf[32];
          qstring seg_name = "mmap_";
          map_block *mb = uc->memmgr->find_block(base);
-         snprintf(buf, sizeof(buf), "%llx", mb->guest);
-         seg_name += buf;
+         seg_name.sprnt("mmap_%p", mb->guest);
          uint32_t bitness = 1;  //default to 32
          if (uc->debug_mode & UC_MODE_16) {
             bitness = 0;
@@ -155,6 +150,7 @@ static error_t idaapi idc_mmap(idc_value_t *argv, idc_value_t *res) {
 
 /*
  * native implementation of sk3wl_munmap.
+ * sk3wl_munmap(long base, long size)
  */
 static error_t idaapi idc_munmap(idc_value_t *argv, idc_value_t *res) {
    res->vtype = VT_LONG;
@@ -163,6 +159,8 @@ static error_t idaapi idc_munmap(idc_value_t *argv, idc_value_t *res) {
       uint64_t base = (uint64_t)argv[0].i64;
       unsigned int sz = (unsigned int)argv[1].num;
       uc->memmgr->munmap(base, sz);
+      add_segm(0, (ea_t)base, (ea_t)base + sz, "delsegxxx", "DATA", ADDSEG_QUIET | ADDSEG_NOAA);
+      del_segm((ea_t)base, SEGMOD_KILL);
    }
    else {
       res->num = -1;

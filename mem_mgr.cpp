@@ -27,6 +27,8 @@
 
 #include "mem_mgr.h"
 
+//#define DEBUG 1
+
 mem_mgr::mem_mgr(uc_engine *uc, uint64_t map_min, uint64_t map_max) {
    root = NULL;
    this->uc = uc;
@@ -198,48 +200,72 @@ void mem_mgr::remove(map_block *tree, map_block *node) {
 #define PROT_WRITE      0x2  // page can be written
 #define PROT_EXEC       0x4  // page can be executed
 */
-map_block *mem_mgr::mmap(uint64_t addr, uint32_t length, uint32_t perms) {
+map_block *mem_mgr::mmap(uint64_t addr, uint32_t length, uint32_t perms, uint32_t flags) {
    uint64_t guest = 0;
+   bool found = false;
    uint64_t orig = addr;
    map_block *b = NULL;
    if (length & 0xfff) {
       //length must be multiple of page size
+#ifdef DEBUG
+      msg("mmap: non-aligned size\n");
+#endif
       return NULL;
    }
    if (addr & 0xfff) {
       //addr must be page aligned
+#ifdef DEBUG
+      msg("mmap: non-aligned address\n");
+#endif
       return NULL;
    }   
    if (length > max_block) {
       //out of memory
+#ifdef DEBUG
+      msg("mmap: out of memory\n");
+#endif
       return NULL;
    }
    //highest address at which this allocation can be made
    uint64_t max_alloc = map_max - length;
-   if (addr >= max_alloc) {
+   if (addr > max_alloc) {
+      if (flags & SDB_MAP_FIXED) {
+         //can't do what user wants
+#ifdef DEBUG
+         msg("mmap: address unavailable for fixed allocation\n");
+#endif
+         return NULL;
+      }
       //just use top down allocation
       addr = 0;
    }
-   if (addr) {
+   if (addr || (flags & SDB_MAP_FIXED) != 0) {
+//   if (addr) {
       //user wants a specific address
       if (addr < map_min) {
          addr = map_min;
          orig = map_min;
       }
       map_block *n = next_block(addr);
-      while (guest == 0 && addr >= map_min && addr <= max_alloc) {
+      while (!found && addr >= map_min && addr <= max_alloc) {
          b = find_block(addr);
          if (b) {
+            //desired address is already in use
+            if (flags & SDB_MAP_FIXED) {
+               return NULL;  //can't grant user request
+            }
+            //compute the next lower address that might fit the entire request block
             addr = b->guest - length;
 #ifdef DEBUG
-            msg("mmap1: addr set to 0x%x\n", (uint32_t)addr);
+            msg("mmap1: addr set to %p\n", (void*)addr);
 #endif
          }
          else if (n == NULL) {
             guest = addr;
 #ifdef DEBUG
-            msg("mmap2: guest set to 0x%x\n", (uint32_t)guest);
+            msg("mmap2: guest set to %p\n", (void*)guest);
 #endif
+            found = true;
          }
          else {
             b = prev_block(addr);
@@ -249,8 +275,9 @@ map_block *mem_mgr::mmap(uint64_t addr, uint32_t length, uint32_t perms) {
                if (gap >= length) {
                   guest = addr;
 #ifdef DEBUG
-                  msg("mmap3: guest set to 0x%x\n", (uint32_t)guest);
+                  msg("mmap3: guest set to %p\n", (void*)guest);
 #endif
+                  found = true;
                }
                else {
                   n = b;
@@ -261,8 +288,9 @@ map_block *mem_mgr::mmap(uint64_t addr, uint32_t length, uint32_t perms) {
                if (gap >= length) {
                   guest = addr;
 #ifdef DEBUG
-                  msg("mmap4: guest set to 0x%x\n", (uint32_t)guest);
+                  msg("mmap4: guest set to %p\n", (void*)guest);
 #endif
+                  found = true;
                }
                else {
                   //hit bottom;
@@ -273,35 +301,37 @@ map_block *mem_mgr::mmap(uint64_t addr, uint32_t length, uint32_t perms) {
       }
       addr = orig;
 #ifdef DEBUG
-      msg("mmap5: addr set to 0x%x\n", (uint32_t)addr);
+      msg("mmap5: addr set to %p\n", (void*)addr);
 #endif
-      while (guest == 0 && addr <= max_alloc) {
+      while (!found && addr <= max_alloc) {
          b = find_block(addr);
          n = next_block(addr);
          if (b) {
             addr = b->guest + b->length;
 #ifdef DEBUG
-            msg("mmap6: addr set to 0x%x\n", (uint32_t)addr);
+            msg("mmap6: addr set to %p\n", (void*)addr);
 #endif
          }
          else if (n == NULL) {
             guest = addr;
 #ifdef DEBUG
-            msg("mmap7: guest set to 0x%x\n", (uint32_t)guest);
+            msg("mmap7: guest set to %p\n", (void*)guest);
 #endif
+            found = true;
          }
          else {
             uint64_t gap = n->guest - addr;
             if (gap >= length) {
                guest = addr;
 #ifdef DEBUG
-               msg("mmap8: guest set to 0x%x\n", (uint32_t)guest);
+               msg("mmap8: guest set to %p\n", (void*)guest);
 #endif
+               found = true;
             }
             else {
                addr = n->guest + n->length;
 #ifdef DEBUG
-               msg("mmap9: addr set to 0x%x\n", (uint32_t)addr);
+               msg("mmap9: addr set to %p\n", (void*)addr);
 #endif
             }
          }
@@ -315,8 +345,9 @@ map_block *mem_mgr::mmap(uint64_t addr, uint32_t length, uint32_t perms) {
             if (top >= (length + map_min)) {
                guest = top - length;
 #ifdef DEBUG
-               msg("mmap10: guest set to 0x%x\n", (uint32_t)guest);
+               msg("mmap10: guest set to %p\n", (void*)guest);
 #endif
+               found = true;
             }
             break;
          }
@@ -325,15 +356,16 @@ map_block *mem_mgr::mmap(uint64_t addr, uint32_t length, uint32_t perms) {
                //fits in the gap
                guest = top - length;
 #ifdef DEBUG
-               msg("mmap11: guest set to 0x%x\n", (uint32_t)guest);
+               msg("mmap11: guest set to %p\n", (void*)guest);
 #endif
+               found = true;
                break;
             }
             top = b->guest;
          }
       }
    }
-   if (guest == 0 && map_min != 0) {
+   if (!found) {
       return NULL;
    }
    void *host = calloc(length, 1);
@@ -341,12 +373,12 @@ map_block *mem_mgr::mmap(uint64_t addr, uint32_t length, uint32_t perms) {
       return NULL;
    }
 #ifdef DEBUG
-   msg("add_block(ptr, 0x%x, 0x%x)\n", (uint32_t)guest, (uint32_t)length);
+   msg("add_block(ptr, %p, 0x%x)\n", (void*)guest, (uint32_t)length);
 #endif
    b = add_block(host, guest, length);
    uc_err err = uc_mem_map_ptr(uc, b->guest, b->length, perms, b->host);
 #ifdef DEBUG
-   msg("uc_mem_map_ptr(0x%x, 0x%x, %d)\n", (uint32_t)b->guest, (uint32_t)b->length, perms);
+   msg("uc_mem_map_ptr(%p, 0x%x, %d)\n", (void*)b->guest, (uint32_t)b->length, perms);
 #endif
    if (err != UC_ERR_OK) {
       msg("Failed on uc_mem_map_ptr() with error returned %u: %s\n", err, uc_strerror(err));
@@ -363,6 +395,9 @@ void mem_mgr::mprotect(uint64_t addr, uint32_t length, uint32_t perms) {
 void mem_mgr::munmap(uint64_t addr, uint32_t length) {
    uint64_t end = addr + length;
    map_block *b = find_block(addr);
+   if (b) {
+      uc_mem_unmap(uc, b->guest, b->length);   
+   }
    do {
       if (b) {
          uint64_t bend = b->guest + b->length;

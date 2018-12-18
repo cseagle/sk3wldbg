@@ -255,7 +255,7 @@ void x86_32_bkpt(uc_engine *uc, sk3wldbg_x86_32 *dbg) {
    brk.pid = dbg->the_process;
    brk.tid = dbg->the_threads.front();
    brk.ea = (ea_t)dbg->get_pc();
-   msg("x86 breakpoint hit at: 0x%llx\n", (uint64_t)brk.ea);
+   msg("x86 breakpoint hit at: %p\n", (uint64_t)brk.ea);
    brk.handled = true;
    bpt.hea = bpt.kea = brk.ea;
    dbg->enqueue_debug_evt(brk);
@@ -263,7 +263,7 @@ void x86_32_bkpt(uc_engine *uc, sk3wldbg_x86_32 *dbg) {
 
 void x86_32_code_hook(uc_engine *uc, uint64_t address, uint32_t /*size*/, sk3wldbg_x86_32 *dbg) {
    static uint64_t last_pc;
-//   msg("x86 code hit at: 0x%llx\n", address);
+//   msg("x86 code hit at: %p\n", address);
    if (last_pc != address && dbg->breakpoints.find((ea_t)address) != dbg->breakpoints.end()) {
       uc_emu_stop(uc);
 //      dbg->emu_state = RS_PAUSE;
