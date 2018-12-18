@@ -326,8 +326,8 @@ void build_sane_gdt(sk3wldbg *uc, uint32_t fs_base, uint64_t init_pc, uint64_t u
    int user_ss = 0x2b; //ring 3 ss we will iret to, need this because we can't set a ring 3 ss directly in unicorn
    int r_ds = 0x2b;
    int r_es = 0x2b;
-   int r_fs = 0x53;
-   int r_gs = 0x2b;
+   int r_fs = 0x53;    //32-bit teb 
+   int r_gs = 0x2b;    //64-bit teb, need to configure w/ wrmsr in ring 0 before transistion to ring 3
 
    int max_desc = 0x53;
    int ndescs = (max_desc >> 3) + 1;
@@ -639,7 +639,7 @@ void build_sane_elf64_gdt(sk3wldbg *uc, uint64_t fs_base, uint64_t init_pc, uint
    int r_ds = 0;
    int r_es = 0;
    int r_fs = 0;
-   int r_gs = 0;
+   int r_gs = 0;       //this is 0x63 in 32-bit code used for tls info, need to set w/ wrmsr
    int intr_seg = 0x40;
 
    uint64_t ia32_star = cpl0_cs;
@@ -970,7 +970,7 @@ bool loadElf64(sk3wldbg *uc, void *img, uint64_t sz, const char *args, uint64_t 
    uc->init_memmgr(0, 0xffff800000002000);  //allow mapping zero page
    uc->map_mem_zero(stack_min, stack_max, UC_PROT_READ | UC_PROT_WRITE | exec_stack);
    msg("elf_fs mapped to %p\n", fs_base);
-   uint8_t *elf_fs = (uint8_t*)uc->map_mem_zero(fs_base, fs_min + 0x2000, UC_PROT_READ | UC_PROT_WRITE, SDB_MAP_FIXED);
+   uint8_t *elf_fs = (uint8_t*)uc->map_mem_zero(fs_base, fs_base + 0x2000, UC_PROT_READ | UC_PROT_WRITE, SDB_MAP_FIXED);
 
    uint8_t *vdso = (uint8_t*)uc->map_mem_zero(vdso_base, vdso_base + 0x1000, UC_PROT_READ | UC_PROT_EXEC, SDB_MAP_FIXED);
 
@@ -1082,7 +1082,7 @@ bool loadElf32(sk3wldbg *uc, void *img, size_t sz, const char *args, uint64_t in
    }
    //ELF stack
    uint32_t stack_top = 0xffffe000;
-   uint32_t stack_min = stack_max - 0x100000;
+   uint32_t stack_min = stack_top - 0x100000;
    uint32_t fs_base = stack_min - 0x3000;
    uint32_t vdso_base = stack_min - 0x4000;
    uc->init_memmgr(0, stack_top);   //allow mapping zero page
