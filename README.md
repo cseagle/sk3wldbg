@@ -155,6 +155,17 @@ load the file image into the Unicorn emulator instance. Outside of these formats
 the plugin simply copies the contents of your IDA sections into the emulator.
 You currently also get a stack and that's about it.
 
+For ELF64/x86_64, the emulator assumes Linux and sets up a minimal trampoline 
+from ring 0 to ring 3 at debug start. Additionaly ring 0 code is installed to 
+handle sysenter and provide a sysexit back to ring 3. A conditional breakpoint
+can be installed at the tail end of the systenter code (marked by a nop) to 
+examine the syscall arguments and, if desired, manipulate the process state
+before resuming execution. See linux_kernel_x64.asm and linux_x64_syscall_bpcond.py
+for ideas.
+
+Future updates will provide similar ring 0 stubs for ELF32/x86/Linux and 
+PE32+/x86_64/Windows.
+
 ## THINGS THAT WORK (> 0% of the time)
 
 * Basic debugger operations such as step and run

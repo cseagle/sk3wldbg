@@ -83,4 +83,63 @@ struct Elf64_Phdr {
   uint64_t   p_align;                /* Segment alignment */
 };
 
+/* from linux/auxvec.h */
+#define _AT_NULL   0     /* end of vector */
+#define _AT_IGNORE 1     /* entry should be ignored */
+#define _AT_EXECFD 2     /* file descriptor of program */
+#define _AT_PHDR   3     /* program headers for program */
+#define _AT_PHENT  4     /* size of program header entry */
+#define _AT_PHNUM  5     /* number of program headers */
+#define _AT_PAGESZ 6     /* system page size */
+#define _AT_BASE   7     /* base address of interpreter */
+#define _AT_FLAGS  8     /* flags */
+#define _AT_ENTRY  9     /* entry point of program */
+#define _AT_NOTELF 10    /* program is not ELF */
+#define _AT_UID    11    /* real uid */
+#define _AT_EUID   12    /* effective uid */
+#define _AT_GID    13    /* real gid */
+#define _AT_EGID   14    /* effective gid */
+#define _AT_PLATFORM 15  /* string identifying CPU for optimizations */
+#define _AT_HWCAP  16    /* arch dependent hints at CPU capabilities */
+#define _AT_CLKTCK 17    /* frequency at which times() increments */
+/* AT_* values 18 through 22 are reserved */
+#define _AT_SECURE 23   /* secure mode boolean */
+#define _AT_BASE_PLATFORM 24     /* string identifying real platform, may
+                                 * differ from AT_PLATFORM. */
+#define _AT_RANDOM 25    /* address of 16 random bytes */
+#define _AT_HWCAP2 26    /* extension of AT_HWCAP */
+
+#define _AT_EXECFN  31   /* filename of program */
+
+#define _AT_SYSINFO_EHDR 33 /* base of vdso */
+
+typedef struct _elf_aux {
+   uint64_t entry;
+   uint64_t vdso;
+   uint64_t phdr;
+   uint64_t phnum;
+   uint64_t phent;
+   uint32_t uid;
+   uint32_t euid;
+   uint32_t gid;
+   uint32_t egid;
+} elf_aux;
+
+//altval indicies for kernel netnode
+#define KERNEL_BRK 0
+#define KERNEL_PID 1
+#define KERNEL_PPID 2
+#define KERNEL_UID 3
+#define KERNEL_EUID 4
+#define KERNEL_GID 5
+#define KERNEL_EGID 6
+#define KERNEL_TID 7
+#define KERNEL_TID_ADDRESS 8
+#define KERNEL_ROBUST_LIST 9
+#define KERNEL_ROBUST_LIST_SIZE 10
+#define KERNEL_MMAP_TOP 11
+
+
+
+
 #endif
