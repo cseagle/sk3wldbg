@@ -511,8 +511,13 @@ int idaapi uni_start_process(const char * /*path*/,
    start.tid = uc->the_threads.front();
    start.ea = BADADDR;
    start.handled = true;
-   mod.base = inf.minEA;
-   mod.size = inf.maxEA - inf.minEA;
+#if IDA_SDK_VERSION < 730
+   mod.base = inf.min_ea;
+   mod.size = inf.max_ea - inf.min_ea;
+#else
+   mod.base = inf_get_min_ea();
+   mod.size = inf_get_max_ea() - inf_get_min_ea();
+#endif
    mod.rebase_to = BADADDR;
    uc->enqueue_debug_evt(start);
 
@@ -625,7 +630,11 @@ int idaapi uni_prepare_to_pause_process(void) {
 #endif
    pause.pid = uc->the_process;
    pause.tid = uc->the_threads.front();
+#if IDA_SDK_VERSION < 730
    pause.ea = inf.minEA;   //??? get pc from unicorn
+#else
+   pause.ea = inf_get_min_ea();
+#endif
    uc->enqueue_debug_evt(pause);
 #ifdef DEBUG
    msg("uni_prepare_to_pause_process complete\n");
@@ -667,7 +676,11 @@ int idaapi uni_exit_process(void) {
 #endif
    stop.pid = uc->the_process;
    stop.tid = uc->the_threads.front();
+#if IDA_SDK_VERSION < 730
    stop.ea = inf.minEA;
+#else
+   stop.ea = inf_get_min_ea();
+#endif
    uc->enqueue_debug_evt(stop);
 
    return 1;
@@ -1512,25 +1525,31 @@ void idaapi uni_get_debapp_attrs(debapp_attrs_t *out_pattrs) {
 #ifdef DEBUG
    msg("uni_get_debapp_attrs called\n");
 #endif
-   out_pattrs->addrsize = (inf.lflags & LFLG_64BIT) ? 8 :4;
-   if (inf.filetype == f_PE) {
-      if (inf.lflags & LFLG_64BIT) {
+#if IDA_SDK_VERSION < 730
+   bool is64 = (inf.lflags & LFLG_64BIT) != 0;
+#else
+   bool is64 = inf_is_64bit();
+   filetype_t filetype = inf_get_filetype();
+#endif
+   out_pattrs->addrsize = is64 ? 8 :4;
+   if (filetype == f_PE) {
+      if (is64) {
          out_pattrs->platform = "win64";
       }
       else {
          out_pattrs->platform = "win32";
       }
    }
-   else if (inf.filetype == f_ELF) {
-      if (inf.lflags & LFLG_64BIT) {
+   else if (filetype == f_ELF) {
+      if (is64) {
          out_pattrs->platform = "linux64";
       }
       else {
          out_pattrs->platform = "linux";
       }
    }
-   else if (inf.filetype == f_MACHO) {
-      if (inf.lflags & LFLG_64BIT) {
+   else if (filetype == f_MACHO) {
+      if (is64) {
          out_pattrs->platform = "macosx64";
       }
       else {
@@ -1588,11 +1607,14 @@ sk3wldbg::sk3wldbg(const char *procname, uc_arch arch, uc_mode mode, const char 
    finished = false;
    single_step = false;
    registered_menu = false;
-#if IDA_SDK_VERSION >= 700
-   if (inf.is_be()) {
+#if IDA_SDK_VERSION >= 730
+   bool is_be = inf_is_be();
+#elif IDA_SDK_VERSION >= 700
+   bool is_be = inf.is_be();
 #else
-   if (inf.mf) {   
+   bool is_be = inf.mf;
 #endif
+   if (is_be) {
       debug_mode = (uc_mode)((int)UC_MODE_BIG_ENDIAN | (int)debug_mode);
       msg("sk3wldbg: Setting Big-Endian mode\n");
    }
@@ -1607,8 +1629,12 @@ sk3wldbg::sk3wldbg(const char *procname, uc_arch arch, uc_mode mode, const char 
             DBG_HAS_SET_EXCEPTION_INFO | DBG_HAS_THREAD_SUSPEND | DBG_HAS_THREAD_CONTINUE |
             DBG_HAS_SET_RESUME_MODE | DBG_HAS_CHECK_BPT;
 #endif
-            
+
+#if IDA_SDK_VERSION < 730
    filetype = (uint8_t)inf.filetype;
+#else
+   filetype = inf_get_filetype();
+#endif
 
    memory_page_size = 0x1000;
    memmgr = NULL;
