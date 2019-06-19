@@ -66,6 +66,8 @@ using std::vector;
 typedef qlist<debug_event_t> evt_list_t;
 typedef qlist<thid_t> thread_list;
 
+void createNewSegment(const char *name, ea_t base, uint32_t size, uint32_t perms, uint32_t bitness);
+
 #if IDA_SDK_VERSION >= 710
 #define register_classes regclasses
 #define register_classes_default default_regclasses
@@ -166,7 +168,7 @@ struct sk3wldbg : public debugger_t {
    bool open();
    void clear_memory() {memory.clear();}
    void init_memmgr(uint64_t map_min, uint64_t map_max);
-   void *map_mem_zero(uint64_t startAddr, uint64_t endAddr, unsigned int perms);
+   void *map_mem_zero(uint64_t startAddr, uint64_t endAddr, unsigned int perms, uint32_t flags = 0);
    void map_mem_copy(uint64_t startAddr, uint64_t endAddr, unsigned int perms, void *src);
    void getRandomBytes(void *buf, unsigned int len);
 

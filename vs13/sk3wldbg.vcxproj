@@ -126,7 +126,7 @@
     <Link>
       <AdditionalOptions>
       </AdditionalOptions>
-      <AdditionalDependencies>ida.lib;unicorn_staload.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>ida.lib;unicorn.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <OutputFile>$(OutDir)$(ProjectName)_user$(TargetExt)</OutputFile>
       <SuppressStartupBanner>true</SuppressStartupBanner>
       <AdditionalLibraryDirectories>lib\x86;..\..\..\lib\x86_win_vc_32;..\..\..\lib\vc.w32;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
@@ -224,7 +224,7 @@
     <Link>
       <AdditionalOptions>
       </AdditionalOptions>
-      <AdditionalDependencies>ida.lib;unicorn_staload.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>ida.lib;unicorn.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <OutputFile>$(OutDir)$(ProjectName)_user$(TargetExt)</OutputFile>
       <SuppressStartupBanner>true</SuppressStartupBanner>
       <AdditionalLibraryDirectories>lib\x86;..\..\..\lib\x86_win_vc_64;..\..\..\lib\vc.w64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
@@ -281,7 +281,7 @@
       <DataExecutionPrevention>
       </DataExecutionPrevention>
       <ImportLibrary>$(IntDir)$(TargetName).lib</ImportLibrary>
-      <GenerateDebugInformation>false</GenerateDebugInformation>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
       <ProgramDatabaseFile>$(IntDir)$(TargetName).pdb</ProgramDatabaseFile>
     </Link>
     <Bscmake>
