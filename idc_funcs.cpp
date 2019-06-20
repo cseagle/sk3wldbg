@@ -121,7 +121,7 @@ void createNewSegment(const char *name, ea_t base, uint32_t size, uint32_t perms
 
 /*
  * native implementation of sk3wl_mmap.
- * long sk3wl_mmap(long base, long size, lonf perms)
+ * long sk3wl_mmap(long base, long size, long perms)
  */
 static error_t idaapi idc_mmap(idc_value_t *argv, idc_value_t *res) {
    res->vtype = VT_INT64;
