@@ -166,10 +166,7 @@ typedef uint32_t WCHARp;     //proxy for WCHAR*
 typedef uint32_t DWORDp;     //proxy for DWORD*
 typedef voidp    _HANDLE;
 
-//UNCOMMENT line below if you are not including windows.h
-//#define WANT_ALL_WINDOWS_H_DEFINITIONS
-#ifdef WANT_ALL_WINDOWS_H_DEFINITIONS
-
+#ifndef _MSC_VER
 
 //
 // Base types
@@ -178,17 +175,20 @@ typedef voidp    _HANDLE;
 //This is for 32 bit so we need pointer fields to size out to 32 bits even when
 //building on 64-bit systems
 
-typedef unsigned char           BYTE;
-typedef char                    CHAR;
-typedef unsigned short          WORD;
-typedef short                   INT16;
-typedef unsigned long           DWORD;
-typedef long                    INT32;
-typedef BYTE                    BOOLEAN;
-typedef voidp                   _HANDLE;
-typedef WORD                    WCHAR;
-typedef DWORD                   LCID;
-typedef DWORD                   KAFFINITY;
+typedef uint8_t           BYTE;
+typedef int8_t            CHAR;
+typedef uint16_t          WORD;
+typedef int16_t           INT16;
+typedef uint32_t          DWORD;
+typedef int32_t           INT32;
+typedef BYTE              BOOLEAN;
+typedef BYTE              UCHAR;
+typedef voidp             _HANDLE;
+typedef WORD              WCHAR;
+typedef WORD              USHORT;
+typedef DWORD             LCID;
+typedef DWORD             KAFFINITY;
+typedef DWORD             ULONG;
 
 #endif //#ifdef WANT_ALL_WINDOWS_H_DEFINITIONS
 
@@ -201,8 +201,8 @@ typedef DWORD                   KAFFINITY;
     typedef __int64             INT64;
 #else
     //GCC
-    typedef unsigned long long  QWORD;
-    typedef long long           INT64;
+    typedef uint64_t  QWORD;
+    typedef int64_t   INT64;
 #endif
 
 
@@ -497,7 +497,7 @@ struct LDR_DATA_TABLE_ENTRY_ {
    ULONG Flags;
    union {
        UCHAR FlagGroup [4];
-       ULONG Flags;
+       ULONG _Flags;
        struct {
            ULONG PackagedBinary : 1;           // 0x00000001
            ULONG MarkedForRemoval : 1;         // 0x00000002
