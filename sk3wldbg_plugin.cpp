@@ -65,7 +65,11 @@
 
 static bool hooked = false;
 
+#if IDA_SDK_VERSION < 750
 int idaapi plugin_init(void);
+#else
+size_t idaapi plugin_init(void);
+#endif
 void idaapi plugin_term(void);
 
 #if IDA_SDK_VERSION >= 700
@@ -162,7 +166,11 @@ static int idaapi ui_hook(void *user_data, int notification_code, va_list va) {
 //      into the processor module and user interface notification points.
 //      See the hook_to_notification_point() function.
 //
+#if IDA_SDK_VERSION < 750
 int idaapi plugin_init(void) {
+#else
+size_t idaapi plugin_init(void) {
+#endif
    sk3wldbg *sdbg = NULL;
    msg("sk3wldbg trying to init\n");
    int debug_mode = UC_MODE_32;

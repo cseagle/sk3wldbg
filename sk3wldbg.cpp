@@ -168,7 +168,7 @@ bool sk3wldbg::queue_exception_event(uint32_t code, uint64_t mem_addr, const cha
    exc.ea = (ea_t)get_pc();
 #ifdef DEBUG
    char msgbuf[4096];
-   qsnprintf(msgbuf, sizeof(msgbuf), "Exception occurred at: %p\n", (void*)exc.ea);
+   _snprintf(msgbuf, sizeof(msgbuf), "Exception occurred at: %p\n", (void*)exc.ea);
    msg("%s", msgbuf);
 #endif
    exc.handled = true;
@@ -217,7 +217,7 @@ bool sk3wldbg::queue_dbg_event(bool is_hardware) {
    brk.ea = (ea_t)get_pc();
 #ifdef DEBUG
    char msgbuf[4096];
-   qsnprintf(msgbuf, sizeof(msgbuf), "Breakpoint hit at: %p\n", (void*)brk.ea);
+   _snprintf(msgbuf, sizeof(msgbuf), "Breakpoint hit at: %p\n", (void*)brk.ea);
    msg("%s", msgbuf);
 #endif
    brk.handled = true;
@@ -236,7 +236,7 @@ struct print_pc : public exec_request_t {
 int idaapi print_pc::execute() {
 #ifdef DEBUG
    char msgbuf[4096];
-   qsnprintf(msgbuf, sizeof(msgbuf), "processRunner running from %p\n", (void*)pc);
+   _snprintf(msgbuf, sizeof(msgbuf), "processRunner running from %p\n", (void*)pc);
    msg("%s", msgbuf);
 #endif
    return 0;
@@ -250,7 +250,9 @@ int idaapi processRunner(void *unicorn) {
       pc = get_screen_ea();
    }
    else {
-      msg("PC was set previously to %p\n", pc);
+      char buf[1024];
+      _snprintf(buf, sizeof(buf), "PC was set previously to %p", (void*)pc);
+      msg("%s\n", buf);
    }
    uc->start(pc);
    //unicorn start has returned, process has ended, so tell IDA to detach
@@ -1044,7 +1046,7 @@ int idaapi uni_get_memory_info(meminfo_vec_t &areas) {
          }
          areas.push_back(mem);
 #ifdef DEBUG
-         qsnprintf(msgbuf, sizeof(msgbuf), "   region %d: %p-%p (%d-%d:%d)\n", i, 
+         _snprintf(msgbuf, sizeof(msgbuf), "   region %d: %p-%p (%d-%d:%d)\n", i, 
                   (void*)mem.startEA, (void*)mem.endEA, mem.perm, regions[i].perms, mem.bitness);
          msg("%s", msgbuf);
 #endif
@@ -1073,7 +1075,7 @@ ssize_t idaapi uni_read_memory(ea_t ea, void *buffer, size_t size) {
    sk3wldbg *uc = (sk3wldbg*)dbg;
 #ifdef DEBUG
    char msgbuf[4096];
-   qsnprintf(msgbuf, sizeof(msgbuf), "uni_read_memory called for %p:%d\n", (void*)ea, size);
+   _snprintf(msgbuf, sizeof(msgbuf), "uni_read_memory called for %p:%d\n", (void*)ea, size);
    msg("%s", msgbuf);
 #endif
    uc_err err = uc_mem_read(uc->uc, ea, buffer, size);
@@ -1094,7 +1096,7 @@ ssize_t idaapi uni_write_memory(ea_t ea, const void *buffer, size_t size) {
    sk3wldbg *uc = (sk3wldbg*)dbg;
 #ifdef DEBUG
    char msgbuf[4096];
-   qsnprintf(msgbuf, sizeof(msgbuf), "uni_write_memory called for %p:%u\n", (void*)ea, (uint32_t)size);
+   _snprintf(msgbuf, sizeof(msgbuf), "uni_write_memory called for %p:%u\n", (void*)ea, (uint32_t)size);
    msg("%s", msgbuf);
 #endif
    uc_err err = uc_mem_write(uc->uc, ea, buffer, size);
@@ -1112,7 +1114,7 @@ ssize_t idaapi uni_write_memory(ea_t ea, const void *buffer, size_t size) {
 int idaapi uni_is_ok_bpt(bpttype_t type, ea_t ea, int /*len*/) {
 #ifdef DEBUG
    char msgbuf[4096];
-   qsnprintf(msgbuf, sizeof(msgbuf), "uni_is_ok_bpt called for %p, type: %d\n", (void*)ea, type);
+   _snprintf(msgbuf, sizeof(msgbuf), "uni_is_ok_bpt called for %p, type: %d\n", (void*)ea, type);
    msg("%s", msgbuf);
 #endif
    //*** test type and setup appropriate actions in hook functions to break
@@ -1241,7 +1243,7 @@ ea_t idaapi uni_map_address(ea_t off, const regval_t * /*regs*/, int /*regnum*/)
 
 /*
    char msgbuf[4096];
-   qsnprintf(msgbuf, sizeof(msgbuf), "uni_map_address called for %p\n", (void*)off);
+   _snprintf(msgbuf, sizeof(msgbuf), "uni_map_address called for %p\n", (void*)off);
    msg("%s", msgbuf);
 */
 /*
@@ -1457,7 +1459,7 @@ int idaapi uni_eval_lowcnd(thid_t /*tid*/, ea_t ea) {
 #endif
 #ifdef DEBUG
    char msgbuf[4096];
-   qsnprintf(msgbuf, sizeof(msgbuf), "uni_eval_lowcnd called: %p\n", (void*)ea);
+   _snprintf(msgbuf, sizeof(msgbuf), "uni_eval_lowcnd called: %p\n", (void*)ea);
    msg("%s", msgbuf);
 #endif
 //   warning("TITLE Under Construction\nICON INFO\nAUTOHIDE NONE\nHIDECANCEL\nConditional breakpoints are currently unimplemented");
@@ -1523,6 +1525,7 @@ void idaapi uni_get_debapp_attrs(debapp_attrs_t *out_pattrs) {
 #endif
 #if IDA_SDK_VERSION < 730
    bool is64 = (inf.lflags & LFLG_64BIT) != 0;
+   filetype_t filetype = (filetype_t)inf.filetype;
 #else
    bool is64 = inf_is_64bit();
    filetype_t filetype = inf_get_filetype();
@@ -1730,9 +1733,9 @@ void sk3wldbg::enqueue_debug_evt(debug_event_t &evt) {
 #ifdef DEBUG
    char msgbuf[4096];
 #if IDA_SDK_VERSION >= 710
-   qsnprintf(msgbuf, sizeof(msgbuf), "Queueing event eid = %d, ea = %p\n", evt.eid(), (void*)evt.ea);
+   _snprintf(msgbuf, sizeof(msgbuf), "Queueing event eid = %d, ea = %p\n", evt.eid(), (void*)evt.ea);
 #else
-   qsnprintf(msgbuf, sizeof(msgbuf), "Queueing event eid = %d, ea = %p\n", evt.eid, (void*)evt.ea);
+   _snprintf(msgbuf, sizeof(msgbuf), "Queueing event eid = %d, ea = %p\n", evt.eid, (void*)evt.ea);
 #endif
    msg("%s", msgbuf);
 #endif
@@ -1779,27 +1782,27 @@ void sk3wldbg::runtime_exception(uc_err err, uint64_t pc) {
    char errmsg[1024];
    errmsg[0] = 0;
 #ifdef DEBUG
-   qsnprintf(errmsg, sizeof(errmsg), "runtime_exception(0x%x, %p)", (uint32_t)err, (void*)pc);
+   _snprintf(errmsg, sizeof(errmsg), "runtime_exception(0x%x, %p)", (uint32_t)err, (void*)pc);
    msg("%s\n", errmsg); 
 #endif
    switch (err) {
       case UC_ERR_READ_UNMAPPED:
-         qsnprintf(errmsg, sizeof(errmsg), "The instruction at 0x%p attempted to read from unmapped memory", (void*)pc);
+         _snprintf(errmsg, sizeof(errmsg), "The instruction at 0x%p attempted to read from unmapped memory", (void*)pc);
          break;
       case UC_ERR_WRITE_UNMAPPED:
-         qsnprintf(errmsg, sizeof(errmsg), "The instruction at %p attempted to write to unmapped memory", (void*)pc);
+         _snprintf(errmsg, sizeof(errmsg), "The instruction at %p attempted to write to unmapped memory", (void*)pc);
          break;
       case UC_ERR_FETCH_UNMAPPED:
-         qsnprintf(errmsg, sizeof(errmsg), "The instruction at %p attempted to execute from unmapped memory", (void*)pc);
+         _snprintf(errmsg, sizeof(errmsg), "The instruction at %p attempted to execute from unmapped memory", (void*)pc);
          break;
       case UC_ERR_WRITE_PROT:
-         qsnprintf(errmsg, sizeof(errmsg), "The instruction at %p attempted to write to write protected memory", (void*)pc);
+         _snprintf(errmsg, sizeof(errmsg), "The instruction at %p attempted to write to write protected memory", (void*)pc);
          break;
       case UC_ERR_READ_PROT:
-         qsnprintf(errmsg, sizeof(errmsg), "The instruction at %p attempted to read from read protected unmapped memory", (void*)pc);
+         _snprintf(errmsg, sizeof(errmsg), "The instruction at %p attempted to read from read protected unmapped memory", (void*)pc);
          break;
       case UC_ERR_FETCH_PROT:
-         qsnprintf(errmsg, sizeof(errmsg), "The instruction at %p attempted to fetch from NX memory", (void*)pc);
+         _snprintf(errmsg, sizeof(errmsg), "The instruction at %p attempted to fetch from NX memory", (void*)pc);
          break;
    }
    queue_exception_event(11, pc, errmsg);   
@@ -1860,7 +1863,7 @@ void sk3wldbg::map_mem_copy(uint64_t startAddr, uint64_t endAddr, unsigned int p
 /*
 void *sk3wldbg::map_mem_zero(uint64_t startAddr, uint64_t endAddr, unsigned int perms) {
    char msgbuf[4096];
-   qsnprintf(msgbuf, sizeof(msgbuf), "map_mem_zero(%p, %p, 0x%x)\n", (void*)startAddr, (void*)endAddr, perms);
+   _snprintf(msgbuf, sizeof(msgbuf), "map_mem_zero(%p, %p, 0x%x)\n", (void*)startAddr, (void*)endAddr, perms);
    msg("%s", msgbuf);
    endAddr = (endAddr + 0xfff) & ~0xfff;
    uint64_t pageAddr = startAddr & ~0xfff;
@@ -1885,7 +1888,7 @@ void *sk3wldbg::map_mem_zero(uint64_t startAddr, uint64_t endAddr, unsigned int 
 
 void *sk3wldbg::map_mem_zero(uint64_t startAddr, uint64_t endAddr, unsigned int perms, uint32_t flags) {
    char msgbuf[4096];
-   qsnprintf(msgbuf, sizeof(msgbuf), "map_mem_zero(%p, %p, 0x%x)\n", (void*)startAddr, (void*)endAddr, perms);
+   _snprintf(msgbuf, sizeof(msgbuf), "map_mem_zero(%p, %p, 0x%x)\n", (void*)startAddr, (void*)endAddr, perms);
    msg("%s", msgbuf);
    endAddr = (endAddr + 0xfff) & ~0xfff;
    uint64_t pageAddr = startAddr & ~0xfff;
@@ -1899,11 +1902,11 @@ void *sk3wldbg::map_mem_zero(uint64_t startAddr, uint64_t endAddr, unsigned int 
    if (b) {
       //return a pointer to the byte corresponding to startAddr
       //this may not be the first byte of block if startAddr was not page aligned
-      qsnprintf(msgbuf, sizeof(msgbuf), "Allocated at %p in map_mem_zero\n", (void*)startAddr);
+      _snprintf(msgbuf, sizeof(msgbuf), "Allocated at %p in map_mem_zero\n", (void*)startAddr);
       msg("%s", msgbuf);
       return (startAddr - pageAddr) + (char*)b->host;
    }
-   qsnprintf(msgbuf, sizeof(msgbuf), "Failed to allocate at %p in map_mem_zero\n", (void*)startAddr);
+   _snprintf(msgbuf, sizeof(msgbuf), "Failed to allocate at %p in map_mem_zero\n", (void*)startAddr);
    msg("%s", msgbuf);
    return NULL;
 }
@@ -1925,7 +1928,7 @@ void sk3wldbg::getRandomBytes(void *buf, unsigned int len) {
 void sk3wldbg::add_bpt(uint64_t bpt_addr) {
 #ifdef DEBUG
    char msgbuf[4096];
-   qsnprintf(msgbuf, sizeof(msgbuf), "add_bpt: %p\n", (void*)bpt_addr);
+   _snprintf(msgbuf, sizeof(msgbuf), "add_bpt: %p\n", (void*)bpt_addr);
    msg("%s", msgbuf);
 #endif
    breakpoints.insert(bpt_addr);
@@ -1934,7 +1937,7 @@ void sk3wldbg::add_bpt(uint64_t bpt_addr) {
 void sk3wldbg::del_bpt(uint64_t bpt_addr) {
 #ifdef DEBUG
    char msgbuf[4096];
-   qsnprintf(msgbuf, sizeof(msgbuf), "del_bpt: %p\n", (void*)bpt_addr);
+   _snprintf(msgbuf, sizeof(msgbuf), "del_bpt: %p\n", (void*)bpt_addr);
    msg("%s", msgbuf);
 #endif
    breakpoints.erase(bpt_addr);
@@ -1957,7 +1960,7 @@ uint64_t sk3wldbg::get_pc() {
 bool sk3wldbg::set_pc(uint64_t pc) {
 #ifdef DEBUG
    char buf[4096];
-   qsnprintf(buf, sizeof(buf), "set_pc called to set to %p\n", (void*)pc);
+   _snprintf(buf, sizeof(buf), "set_pc called to set to %p\n", (void*)pc);
    msg("%s", buf);
 #endif
    for (int i = 0; i < registers_size; i++) {
@@ -2014,27 +2017,27 @@ bool generic_mem_fault_hook(uc_engine *uc, uc_mem_type type, uint64_t address,
    char errmsg[1024];
    errmsg[0] = 0;
 #ifdef DEBUG
-   qsnprintf(errmsg, sizeof(errmsg), "generic_mem_fault_hook(0x%x, %p)", (uint32_t)type, (void*)address);
+   _snprintf(errmsg, sizeof(errmsg), "generic_mem_fault_hook(0x%x, %p)", (uint32_t)type, (void*)address);
    msg("%s\n", errmsg); 
 #endif
    switch (type) {
       case UC_MEM_READ_UNMAPPED:
-         qsnprintf(errmsg, sizeof(errmsg), "The instruction at %p attempted to read from unmapped memory", (void*)pc);
+         _snprintf(errmsg, sizeof(errmsg), "The instruction at %p attempted to read from unmapped memory", (void*)pc);
          break;
       case UC_MEM_WRITE_UNMAPPED:
-         qsnprintf(errmsg, sizeof(errmsg), "The instruction at %p attempted to write to unmapped memory", (void*)pc);
+         _snprintf(errmsg, sizeof(errmsg), "The instruction at %p attempted to write to unmapped memory", (void*)pc);
          break;
       case UC_MEM_FETCH_UNMAPPED:
-         qsnprintf(errmsg, sizeof(errmsg), "The instruction at %p attempted to execute from unmapped memory", (void*)pc);
+         _snprintf(errmsg, sizeof(errmsg), "The instruction at %p attempted to execute from unmapped memory", (void*)pc);
          break;
       case UC_MEM_WRITE_PROT:
-         qsnprintf(errmsg, sizeof(errmsg), "The instruction at %p attempted to write to write protected memory", (void*)pc);
+         _snprintf(errmsg, sizeof(errmsg), "The instruction at %p attempted to write to write protected memory", (void*)pc);
          break;
       case UC_MEM_READ_PROT:
-         qsnprintf(errmsg, sizeof(errmsg), "The instruction at %p attempted to read from read protected unmapped memory", (void*)pc);
+         _snprintf(errmsg, sizeof(errmsg), "The instruction at %p attempted to read from read protected unmapped memory", (void*)pc);
          break;
       case UC_MEM_FETCH_PROT:
-         qsnprintf(errmsg, sizeof(errmsg), "The instruction at %p attempted to fetch from NX memory", (void*)pc);
+         _snprintf(errmsg, sizeof(errmsg), "The instruction at %p attempted to fetch from NX memory", (void*)pc);
          break;
    }
    dbg->queue_exception_event(11, address, errmsg);   
@@ -2047,7 +2050,7 @@ void generic_code_hook(uc_engine *uc, uint64_t address, uint32_t size, sk3wldbg 
    bool stopping = false;
 #ifdef DEBUG
    char buf[1204];
-   qsnprintf(buf, sizeof(buf), "code hit at: %p, expecting to exec %p\n", (void*)address, (void*)get_dword((ea_t)address));
+   _snprintf(buf, sizeof(buf), "code hit at: %p, expecting to exec %p\n", (void*)address, (void*)get_dword((ea_t)address));
    do_safe_msg(buf);
    uint32_t opc;
    uc_mem_read(dbg->uc, address, &opc, sizeof(opc));
@@ -2134,7 +2137,7 @@ void generic_code_hook(uc_engine *uc, uint64_t address, uint32_t size, sk3wldbg 
 
 #ifdef DEBUG
    ea_t cpc = (ea_t)dbg->get_pc();
-   ::qsnprintf(buf, sizeof(buf), "pc out of break is: %p\n", (void*)cpc);
+   _snprintf(buf, sizeof(buf), "pc out of break is: %p\n", (void*)cpc);
    do_safe_msg(buf);
 #endif
 
@@ -2147,7 +2150,7 @@ void generic_code_hook(uc_engine *uc, uint64_t address, uint32_t size, sk3wldbg 
 
 #ifdef DEBUG
    cpc = (ea_t)dbg->get_pc();
-   ::qsnprintf(buf, sizeof(buf), "pc leaving is: %p\n", (void*)cpc);
+   _snprintf(buf, sizeof(buf), "pc leaving is: %p\n", (void*)cpc);
    do_safe_msg(buf);
 #endif
 
