@@ -310,12 +310,12 @@ void build_sane_gdt(sk3wldbg *uc, uint32_t fs_base, uint64_t init_pc, uint64_t u
    uc_x86_mmr gdtr = {0, 0, 0, 0};
 
    uint64_t gdt_address = 0x80000000;
-   
-   //unicorn starts w/ cpl == 0 
-   
+
+   //unicorn starts w/ cpl == 0
+
    //initial sp, this will point to iret data to get us to ring 3
    uint64_t init_sp = gdt_address + 0xf00;
-   
+
    //initial pc, this will point to an iret to kick us up to ring 3
    uint64_t kernel_pc = gdt_address + 0xc00;
 
@@ -326,7 +326,7 @@ void build_sane_gdt(sk3wldbg *uc, uint32_t fs_base, uint64_t init_pc, uint64_t u
    int user_ss = 0x2b; //ring 3 ss we will iret to, need this because we can't set a ring 3 ss directly in unicorn
    int r_ds = 0x2b;
    int r_es = 0x2b;
-   int r_fs = 0x53;    //32-bit teb 
+   int r_fs = 0x53;    //32-bit teb
    int r_gs = 0x2b;    //64-bit teb, need to configure w/ wrmsr in ring 0 before transistion to ring 3
 
    int max_desc = 0x53;
@@ -336,7 +336,7 @@ void build_sane_gdt(sk3wldbg *uc, uint32_t fs_base, uint64_t init_pc, uint64_t u
    // map GDT
    uint8_t *block = (uint8_t*)uc->map_mem_zero(gdt_address, gdt_address + 0x1000, UC_PROT_WRITE | UC_PROT_READ | UC_PROT_EXEC, SDB_MAP_FIXED);
    SegmentDescriptor *gdt = (SegmentDescriptor *)block;
-   
+
    //store the iret opcode into memory (initial pc will point here)
    block[0xc00] = 0xcf;   //iret
 
@@ -620,12 +620,12 @@ void build_sane_elf64_gdt(sk3wldbg *uc, uint64_t fs_base, uint64_t init_pc, uint
 
    uint64_t gdt_address = 0xFFFF800000000000;
    uint64_t idt_address = gdt_address + 0x400;
-   
-   //unicorn starts w/ cpl == 0 
-   
+
+   //unicorn starts w/ cpl == 0
+
    //initial sp, this will point to iret data to get us to ring 3
    uint64_t init_sp = gdt_address + 0xf00;
-   
+
    //initial pc, this will point to an iret to kick us up to ring 3
    uint64_t kernel_pc = gdt_address + 0xc00;
 
@@ -651,7 +651,7 @@ void build_sane_elf64_gdt(sk3wldbg *uc, uint64_t fs_base, uint64_t init_pc, uint
 
    // map GDT
    uint8_t *block = (uint8_t*)uc->map_mem_zero(gdt_address, gdt_address + 0x1000, UC_PROT_WRITE | UC_PROT_READ | UC_PROT_EXEC, SDB_MAP_FIXED);
-   
+
    qstring sname;
    sname.sprnt("debug_%p", gdt_address);
    createNewSegment(sname.c_str(), gdt_address, 0x1000, uc_to_ida_perms_map[UC_PROT_WRITE | UC_PROT_READ | UC_PROT_EXEC], 2);
@@ -827,7 +827,7 @@ static uint64_t create_elf_env(sk3wldbg *uc, uint64_t sp, elf_aux *av, const cha
    uint64_t at_platform = sp;
    uint8_t at_random_buf[16];
    uc->getRandomBytes(at_random_buf, sizeof(at_random_buf));
-   sp = uc_push_buf(uc, sp, at_random_buf, sizeof(at_random_buf));   
+   sp = uc_push_buf(uc, sp, at_random_buf, sizeof(at_random_buf));
    uint64_t at_random = sp;
 
    sp &= is_64 ? ~7 : ~3;   //align sp to 4 or 8 bytes

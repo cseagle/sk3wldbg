@@ -22,15 +22,15 @@ ENTRY:
 
    mov rax, 0x4141414141414141    ; replace with desired fs_base
    call set_fs_base
-   
+
    ; setup syscall handler address
    lea rax, [rel syscall_handler]
    call set_lstar
-   
+
    ; setup sysret and syscall segments
    mov rax, 0x230010 << 32
    call set_star
-   
+
    xor rax, rax
    xor rdx, rdx
    xor rcx, rcx
@@ -71,12 +71,12 @@ do_rdmsr:
    ret
 
 set_star:
-   mov ecx, IA32_STAR   
+   mov ecx, IA32_STAR
    call do_wrmsr
    ret
 
 set_lstar:               ; syscall addr:
-   mov ecx, IA32_LSTAR   
+   mov ecx, IA32_LSTAR
    call do_wrmsr
    ret
 
@@ -138,6 +138,6 @@ doret:
    pop rcx
    pop rsp
    o64 sysret      ; force 64-bit operad size
-   
+
 align 0x1000
 kstack:

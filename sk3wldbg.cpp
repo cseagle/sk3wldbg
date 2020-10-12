@@ -79,9 +79,9 @@
 #include "loader.h"
 
 #ifdef DEBUG
-#undef DEBUG 
+#undef DEBUG
 #else
-#undef DEBUG 
+#undef DEBUG
 #endif
 
 static ssize_t idaapi idd_hook(void * /* ud */, int notification_code, va_list va);
@@ -97,7 +97,7 @@ int idaapi safe_msg::execute() {
    return 0;
 }
 
-//Not certain this is necessary, but included to provide for message printing from 
+//Not certain this is necessary, but included to provide for message printing from
 //the unicorn thread
 void do_safe_msg(const char *msg) {
    qstring m(msg);
@@ -168,7 +168,7 @@ bool sk3wldbg::queue_exception_event(uint32_t code, uint64_t mem_addr, const cha
    exc.ea = (ea_t)get_pc();
 #ifdef DEBUG
    char msgbuf[4096];
-   qsnprintf(msgbuf, sizeof(msgbuf), "Exception occurred at: %p\n", (void*)exc.ea);
+   _snprintf(msgbuf, sizeof(msgbuf), "Exception occurred at: %p\n", (void*)exc.ea);
    msg("%s", msgbuf);
 #endif
    exc.handled = true;
@@ -217,7 +217,7 @@ bool sk3wldbg::queue_dbg_event(bool is_hardware) {
    brk.ea = (ea_t)get_pc();
 #ifdef DEBUG
    char msgbuf[4096];
-   qsnprintf(msgbuf, sizeof(msgbuf), "Breakpoint hit at: %p\n", (void*)brk.ea);
+   _snprintf(msgbuf, sizeof(msgbuf), "Breakpoint hit at: %p\n", (void*)brk.ea);
    msg("%s", msgbuf);
 #endif
    brk.handled = true;
@@ -236,7 +236,7 @@ struct print_pc : public exec_request_t {
 int idaapi print_pc::execute() {
 #ifdef DEBUG
    char msgbuf[4096];
-   qsnprintf(msgbuf, sizeof(msgbuf), "processRunner running from %p\n", (void*)pc);
+   _snprintf(msgbuf, sizeof(msgbuf), "processRunner running from %p\n", (void*)pc);
    msg("%s", msgbuf);
 #endif
    return 0;
@@ -250,7 +250,9 @@ int idaapi processRunner(void *unicorn) {
       pc = get_screen_ea();
    }
    else {
-      msg("PC was set previously to %p\n", pc);
+      char buf[1024];
+      _snprintf(buf, sizeof(buf), "PC was set previously to %p", (void*)pc);
+      msg("%s\n", buf);
    }
    uc->start(pc);
    //unicorn start has returned, process has ended, so tell IDA to detach
@@ -372,7 +374,7 @@ int idaapi uni_start_process(const char * /*path*/,
    int choice = ask_buttons("Cursor", "Entry point", NULL, ASKBTN_YES, "Begin execution from:");
 
    ea_t init_pc = BADADDR;
-   
+
    if (choice == ASKBTN_YES) {
       init_pc = get_screen_ea();
       uc->check_mode(init_pc);
@@ -472,7 +474,7 @@ int idaapi uni_start_process(const char * /*path*/,
 
    //init registers
    //TODO: each architecture subclass should have its own register state initialization
-   
+
    //register unicorn hooks
 
    //start in break state, RS_RUN will be set in uni_continue_after_event
@@ -506,8 +508,13 @@ int idaapi uni_start_process(const char * /*path*/,
    start.tid = uc->the_threads.front();
    start.ea = BADADDR;
    start.handled = true;
-   mod.base = inf.minEA;
-   mod.size = inf.maxEA - inf.minEA;
+#if IDA_SDK_VERSION < 730
+   mod.base = inf.min_ea;
+   mod.size = inf.max_ea - inf.min_ea;
+#else
+   mod.base = inf_get_min_ea();
+   mod.size = inf_get_max_ea() - inf_get_min_ea();
+#endif
    mod.rebase_to = BADADDR;
    uc->enqueue_debug_evt(start);
 
@@ -620,7 +627,11 @@ int idaapi uni_prepare_to_pause_process(void) {
 #endif
    pause.pid = uc->the_process;
    pause.tid = uc->the_threads.front();
+#if IDA_SDK_VERSION < 730
    pause.ea = inf.minEA;   //??? get pc from unicorn
+#else
+   pause.ea = inf_get_min_ea();
+#endif
    uc->enqueue_debug_evt(pause);
 #ifdef DEBUG
    msg("uni_prepare_to_pause_process complete\n");
@@ -662,7 +673,11 @@ int idaapi uni_exit_process(void) {
 #endif
    stop.pid = uc->the_process;
    stop.tid = uc->the_threads.front();
+#if IDA_SDK_VERSION < 730
    stop.ea = inf.minEA;
+#else
+   stop.ea = inf_get_min_ea();
+#endif
    uc->enqueue_debug_evt(stop);
 
    return 1;
@@ -1031,7 +1046,7 @@ int idaapi uni_get_memory_info(meminfo_vec_t &areas) {
          }
          areas.push_back(mem);
 #ifdef DEBUG
-         qsnprintf(msgbuf, sizeof(msgbuf), "   region %d: %p-%p (%d-%d:%d)\n", i, 
+         _snprintf(msgbuf, sizeof(msgbuf), "   region %d: %p-%p (%d-%d:%d)\n", i,
                   (void*)mem.startEA, (void*)mem.endEA, mem.perm, regions[i].perms, mem.bitness);
          msg("%s", msgbuf);
 #endif
@@ -1060,7 +1075,7 @@ ssize_t idaapi uni_read_memory(ea_t ea, void *buffer, size_t size) {
    sk3wldbg *uc = (sk3wldbg*)dbg;
 #ifdef DEBUG
    char msgbuf[4096];
-   qsnprintf(msgbuf, sizeof(msgbuf), "uni_read_memory called for %p:%d\n", (void*)ea, size);
+   _snprintf(msgbuf, sizeof(msgbuf), "uni_read_memory called for %p:%d\n", (void*)ea, size);
    msg("%s", msgbuf);
 #endif
    uc_err err = uc_mem_read(uc->uc, ea, buffer, size);
@@ -1081,7 +1096,7 @@ ssize_t idaapi uni_write_memory(ea_t ea, const void *buffer, size_t size) {
    sk3wldbg *uc = (sk3wldbg*)dbg;
 #ifdef DEBUG
    char msgbuf[4096];
-   qsnprintf(msgbuf, sizeof(msgbuf), "uni_write_memory called for %p:%u\n", (void*)ea, (uint32_t)size);
+   _snprintf(msgbuf, sizeof(msgbuf), "uni_write_memory called for %p:%u\n", (void*)ea, (uint32_t)size);
    msg("%s", msgbuf);
 #endif
    uc_err err = uc_mem_write(uc->uc, ea, buffer, size);
@@ -1099,7 +1114,7 @@ ssize_t idaapi uni_write_memory(ea_t ea, const void *buffer, size_t size) {
 int idaapi uni_is_ok_bpt(bpttype_t type, ea_t ea, int /*len*/) {
 #ifdef DEBUG
    char msgbuf[4096];
-   qsnprintf(msgbuf, sizeof(msgbuf), "uni_is_ok_bpt called for %p, type: %d\n", (void*)ea, type);
+   _snprintf(msgbuf, sizeof(msgbuf), "uni_is_ok_bpt called for %p, type: %d\n", (void*)ea, type);
    msg("%s", msgbuf);
 #endif
    //*** test type and setup appropriate actions in hook functions to break
@@ -1228,7 +1243,7 @@ ea_t idaapi uni_map_address(ea_t off, const regval_t * /*regs*/, int /*regnum*/)
 
 /*
    char msgbuf[4096];
-   qsnprintf(msgbuf, sizeof(msgbuf), "uni_map_address called for %p\n", (void*)off);
+   _snprintf(msgbuf, sizeof(msgbuf), "uni_map_address called for %p\n", (void*)off);
    msg("%s", msgbuf);
 */
 /*
@@ -1444,7 +1459,7 @@ int idaapi uni_eval_lowcnd(thid_t /*tid*/, ea_t ea) {
 #endif
 #ifdef DEBUG
    char msgbuf[4096];
-   qsnprintf(msgbuf, sizeof(msgbuf), "uni_eval_lowcnd called: %p\n", (void*)ea);
+   _snprintf(msgbuf, sizeof(msgbuf), "uni_eval_lowcnd called: %p\n", (void*)ea);
    msg("%s", msgbuf);
 #endif
 //   warning("TITLE Under Construction\nICON INFO\nAUTOHIDE NONE\nHIDECANCEL\nConditional breakpoints are currently unimplemented");
@@ -1508,25 +1523,32 @@ void idaapi uni_get_debapp_attrs(debapp_attrs_t *out_pattrs) {
 #ifdef DEBUG
    msg("uni_get_debapp_attrs called\n");
 #endif
-   out_pattrs->addrsize = (inf.lflags & LFLG_64BIT) ? 8 :4;
-   if (inf.filetype == f_PE) {
-      if (inf.lflags & LFLG_64BIT) {
+#if IDA_SDK_VERSION < 730
+   bool is64 = (inf.lflags & LFLG_64BIT) != 0;
+   filetype_t filetype = (filetype_t)inf.filetype;
+#else
+   bool is64 = inf_is_64bit();
+   filetype_t filetype = inf_get_filetype();
+#endif
+   out_pattrs->addrsize = is64 ? 8 :4;
+   if (filetype == f_PE) {
+      if (is64) {
          out_pattrs->platform = "win64";
       }
       else {
          out_pattrs->platform = "win32";
       }
    }
-   else if (inf.filetype == f_ELF) {
-      if (inf.lflags & LFLG_64BIT) {
+   else if (filetype == f_ELF) {
+      if (is64) {
          out_pattrs->platform = "linux64";
       }
       else {
          out_pattrs->platform = "linux";
       }
    }
-   else if (inf.filetype == f_MACHO) {
-      if (inf.lflags & LFLG_64BIT) {
+   else if (filetype == f_MACHO) {
+      if (is64) {
          out_pattrs->platform = "macosx64";
       }
       else {
@@ -1584,11 +1606,14 @@ sk3wldbg::sk3wldbg(const char *procname, uc_arch arch, uc_mode mode, const char 
    finished = false;
    single_step = false;
    registered_menu = false;
-#if IDA_SDK_VERSION >= 700
-   if (inf.is_be()) {
+#if IDA_SDK_VERSION >= 730
+   bool is_be = inf_is_be();
+#elif IDA_SDK_VERSION >= 700
+   bool is_be = inf.is_be();
 #else
-   if (inf.mf) {   
+   bool is_be = inf.mf;
 #endif
+   if (is_be) {
       debug_mode = (uc_mode)((int)UC_MODE_BIG_ENDIAN | (int)debug_mode);
       msg("sk3wldbg: Setting Big-Endian mode\n");
    }
@@ -1603,8 +1628,12 @@ sk3wldbg::sk3wldbg(const char *procname, uc_arch arch, uc_mode mode, const char 
             DBG_HAS_SET_EXCEPTION_INFO | DBG_HAS_THREAD_SUSPEND | DBG_HAS_THREAD_CONTINUE |
             DBG_HAS_SET_RESUME_MODE | DBG_HAS_CHECK_BPT;
 #endif
-            
+
+#if IDA_SDK_VERSION < 730
    filetype = (uint8_t)inf.filetype;
+#else
+   filetype = inf_get_filetype();
+#endif
 
    memory_page_size = 0x1000;
    memmgr = NULL;
@@ -1704,9 +1733,9 @@ void sk3wldbg::enqueue_debug_evt(debug_event_t &evt) {
 #ifdef DEBUG
    char msgbuf[4096];
 #if IDA_SDK_VERSION >= 710
-   qsnprintf(msgbuf, sizeof(msgbuf), "Queueing event eid = %d, ea = %p\n", evt.eid(), (void*)evt.ea);
+   _snprintf(msgbuf, sizeof(msgbuf), "Queueing event eid = %d, ea = %p\n", evt.eid(), (void*)evt.ea);
 #else
-   qsnprintf(msgbuf, sizeof(msgbuf), "Queueing event eid = %d, ea = %p\n", evt.eid, (void*)evt.ea);
+   _snprintf(msgbuf, sizeof(msgbuf), "Queueing event eid = %d, ea = %p\n", evt.eid, (void*)evt.ea);
 #endif
    msg("%s", msgbuf);
 #endif
@@ -1753,30 +1782,30 @@ void sk3wldbg::runtime_exception(uc_err err, uint64_t pc) {
    char errmsg[1024];
    errmsg[0] = 0;
 #ifdef DEBUG
-   qsnprintf(errmsg, sizeof(errmsg), "runtime_exception(0x%x, %p)", (uint32_t)err, (void*)pc);
-   msg("%s\n", errmsg); 
+   _snprintf(errmsg, sizeof(errmsg), "runtime_exception(0x%x, %p)", (uint32_t)err, (void*)pc);
+   msg("%s\n", errmsg);
 #endif
    switch (err) {
       case UC_ERR_READ_UNMAPPED:
-         qsnprintf(errmsg, sizeof(errmsg), "The instruction at 0x%p attempted to read from unmapped memory", (void*)pc);
+         _snprintf(errmsg, sizeof(errmsg), "The instruction at 0x%p attempted to read from unmapped memory", (void*)pc);
          break;
       case UC_ERR_WRITE_UNMAPPED:
-         qsnprintf(errmsg, sizeof(errmsg), "The instruction at %p attempted to write to unmapped memory", (void*)pc);
+         _snprintf(errmsg, sizeof(errmsg), "The instruction at %p attempted to write to unmapped memory", (void*)pc);
          break;
       case UC_ERR_FETCH_UNMAPPED:
-         qsnprintf(errmsg, sizeof(errmsg), "The instruction at %p attempted to execute from unmapped memory", (void*)pc);
+         _snprintf(errmsg, sizeof(errmsg), "The instruction at %p attempted to execute from unmapped memory", (void*)pc);
          break;
       case UC_ERR_WRITE_PROT:
-         qsnprintf(errmsg, sizeof(errmsg), "The instruction at %p attempted to write to write protected memory", (void*)pc);
+         _snprintf(errmsg, sizeof(errmsg), "The instruction at %p attempted to write to write protected memory", (void*)pc);
          break;
       case UC_ERR_READ_PROT:
-         qsnprintf(errmsg, sizeof(errmsg), "The instruction at %p attempted to read from read protected unmapped memory", (void*)pc);
+         _snprintf(errmsg, sizeof(errmsg), "The instruction at %p attempted to read from read protected unmapped memory", (void*)pc);
          break;
       case UC_ERR_FETCH_PROT:
-         qsnprintf(errmsg, sizeof(errmsg), "The instruction at %p attempted to fetch from NX memory", (void*)pc);
+         _snprintf(errmsg, sizeof(errmsg), "The instruction at %p attempted to fetch from NX memory", (void*)pc);
          break;
    }
-   queue_exception_event(11, pc, errmsg);   
+   queue_exception_event(11, pc, errmsg);
 }
 
 void sk3wldbg::start(uint64_t pc) {
@@ -1834,7 +1863,7 @@ void sk3wldbg::map_mem_copy(uint64_t startAddr, uint64_t endAddr, unsigned int p
 /*
 void *sk3wldbg::map_mem_zero(uint64_t startAddr, uint64_t endAddr, unsigned int perms) {
    char msgbuf[4096];
-   qsnprintf(msgbuf, sizeof(msgbuf), "map_mem_zero(%p, %p, 0x%x)\n", (void*)startAddr, (void*)endAddr, perms);
+   _snprintf(msgbuf, sizeof(msgbuf), "map_mem_zero(%p, %p, 0x%x)\n", (void*)startAddr, (void*)endAddr, perms);
    msg("%s", msgbuf);
    endAddr = (endAddr + 0xfff) & ~0xfff;
    uint64_t pageAddr = startAddr & ~0xfff;
@@ -1859,7 +1888,7 @@ void *sk3wldbg::map_mem_zero(uint64_t startAddr, uint64_t endAddr, unsigned int 
 
 void *sk3wldbg::map_mem_zero(uint64_t startAddr, uint64_t endAddr, unsigned int perms, uint32_t flags) {
    char msgbuf[4096];
-   qsnprintf(msgbuf, sizeof(msgbuf), "map_mem_zero(%p, %p, 0x%x)\n", (void*)startAddr, (void*)endAddr, perms);
+   _snprintf(msgbuf, sizeof(msgbuf), "map_mem_zero(%p, %p, 0x%x)\n", (void*)startAddr, (void*)endAddr, perms);
    msg("%s", msgbuf);
    endAddr = (endAddr + 0xfff) & ~0xfff;
    uint64_t pageAddr = startAddr & ~0xfff;
@@ -1873,11 +1902,11 @@ void *sk3wldbg::map_mem_zero(uint64_t startAddr, uint64_t endAddr, unsigned int 
    if (b) {
       //return a pointer to the byte corresponding to startAddr
       //this may not be the first byte of block if startAddr was not page aligned
-      qsnprintf(msgbuf, sizeof(msgbuf), "Allocated at %p in map_mem_zero\n", (void*)startAddr);
+      _snprintf(msgbuf, sizeof(msgbuf), "Allocated at %p in map_mem_zero\n", (void*)startAddr);
       msg("%s", msgbuf);
       return (startAddr - pageAddr) + (char*)b->host;
    }
-   qsnprintf(msgbuf, sizeof(msgbuf), "Failed to allocate at %p in map_mem_zero\n", (void*)startAddr);
+   _snprintf(msgbuf, sizeof(msgbuf), "Failed to allocate at %p in map_mem_zero\n", (void*)startAddr);
    msg("%s", msgbuf);
    return NULL;
 }
@@ -1899,7 +1928,7 @@ void sk3wldbg::getRandomBytes(void *buf, unsigned int len) {
 void sk3wldbg::add_bpt(uint64_t bpt_addr) {
 #ifdef DEBUG
    char msgbuf[4096];
-   qsnprintf(msgbuf, sizeof(msgbuf), "add_bpt: %p\n", (void*)bpt_addr);
+   _snprintf(msgbuf, sizeof(msgbuf), "add_bpt: %p\n", (void*)bpt_addr);
    msg("%s", msgbuf);
 #endif
    breakpoints.insert(bpt_addr);
@@ -1908,7 +1937,7 @@ void sk3wldbg::add_bpt(uint64_t bpt_addr) {
 void sk3wldbg::del_bpt(uint64_t bpt_addr) {
 #ifdef DEBUG
    char msgbuf[4096];
-   qsnprintf(msgbuf, sizeof(msgbuf), "del_bpt: %p\n", (void*)bpt_addr);
+   _snprintf(msgbuf, sizeof(msgbuf), "del_bpt: %p\n", (void*)bpt_addr);
    msg("%s", msgbuf);
 #endif
    breakpoints.erase(bpt_addr);
@@ -1931,7 +1960,7 @@ uint64_t sk3wldbg::get_pc() {
 bool sk3wldbg::set_pc(uint64_t pc) {
 #ifdef DEBUG
    char buf[4096];
-   qsnprintf(buf, sizeof(buf), "set_pc called to set to %p\n", (void*)pc);
+   _snprintf(buf, sizeof(buf), "set_pc called to set to %p\n", (void*)pc);
    msg("%s", buf);
 #endif
    for (int i = 0; i < registers_size; i++) {
@@ -1978,7 +2007,7 @@ void intr_hook(uc_engine *uc, uint32_t intno, void *user_data) {
    errmsg[0] = 0;
 #ifdef DEBUG
    qsnprintf(errmsg, sizeof(errmsg), "intr_hook(0x%x)", intno);
-   msg("%s\n", errmsg); 
+   msg("%s\n", errmsg);
 #endif
 }
 
@@ -1988,30 +2017,30 @@ bool generic_mem_fault_hook(uc_engine *uc, uc_mem_type type, uint64_t address,
    char errmsg[1024];
    errmsg[0] = 0;
 #ifdef DEBUG
-   qsnprintf(errmsg, sizeof(errmsg), "generic_mem_fault_hook(0x%x, %p)", (uint32_t)type, (void*)address);
-   msg("%s\n", errmsg); 
+   _snprintf(errmsg, sizeof(errmsg), "generic_mem_fault_hook(0x%x, %p)", (uint32_t)type, (void*)address);
+   msg("%s\n", errmsg);
 #endif
    switch (type) {
       case UC_MEM_READ_UNMAPPED:
-         qsnprintf(errmsg, sizeof(errmsg), "The instruction at %p attempted to read from unmapped memory", (void*)pc);
+         _snprintf(errmsg, sizeof(errmsg), "The instruction at %p attempted to read from unmapped memory", (void*)pc);
          break;
       case UC_MEM_WRITE_UNMAPPED:
-         qsnprintf(errmsg, sizeof(errmsg), "The instruction at %p attempted to write to unmapped memory", (void*)pc);
+         _snprintf(errmsg, sizeof(errmsg), "The instruction at %p attempted to write to unmapped memory", (void*)pc);
          break;
       case UC_MEM_FETCH_UNMAPPED:
-         qsnprintf(errmsg, sizeof(errmsg), "The instruction at %p attempted to execute from unmapped memory", (void*)pc);
+         _snprintf(errmsg, sizeof(errmsg), "The instruction at %p attempted to execute from unmapped memory", (void*)pc);
          break;
       case UC_MEM_WRITE_PROT:
-         qsnprintf(errmsg, sizeof(errmsg), "The instruction at %p attempted to write to write protected memory", (void*)pc);
+         _snprintf(errmsg, sizeof(errmsg), "The instruction at %p attempted to write to write protected memory", (void*)pc);
          break;
       case UC_MEM_READ_PROT:
-         qsnprintf(errmsg, sizeof(errmsg), "The instruction at %p attempted to read from read protected unmapped memory", (void*)pc);
+         _snprintf(errmsg, sizeof(errmsg), "The instruction at %p attempted to read from read protected unmapped memory", (void*)pc);
          break;
       case UC_MEM_FETCH_PROT:
-         qsnprintf(errmsg, sizeof(errmsg), "The instruction at %p attempted to fetch from NX memory", (void*)pc);
+         _snprintf(errmsg, sizeof(errmsg), "The instruction at %p attempted to fetch from NX memory", (void*)pc);
          break;
    }
-   dbg->queue_exception_event(11, address, errmsg);   
+   dbg->queue_exception_event(11, address, errmsg);
    return false;
 }
 
@@ -2021,7 +2050,7 @@ void generic_code_hook(uc_engine *uc, uint64_t address, uint32_t size, sk3wldbg 
    bool stopping = false;
 #ifdef DEBUG
    char buf[1204];
-   qsnprintf(buf, sizeof(buf), "code hit at: %p, expecting to exec %p\n", (void*)address, (void*)get_dword((ea_t)address));
+   _snprintf(buf, sizeof(buf), "code hit at: %p, expecting to exec %p\n", (void*)address, (void*)get_dword((ea_t)address));
    do_safe_msg(buf);
    uint32_t opc;
    uc_mem_read(dbg->uc, address, &opc, sizeof(opc));
@@ -2108,7 +2137,7 @@ void generic_code_hook(uc_engine *uc, uint64_t address, uint32_t size, sk3wldbg 
 
 #ifdef DEBUG
    ea_t cpc = (ea_t)dbg->get_pc();
-   ::qsnprintf(buf, sizeof(buf), "pc out of break is: %p\n", (void*)cpc);
+   _snprintf(buf, sizeof(buf), "pc out of break is: %p\n", (void*)cpc);
    do_safe_msg(buf);
 #endif
 
@@ -2121,7 +2150,7 @@ void generic_code_hook(uc_engine *uc, uint64_t address, uint32_t size, sk3wldbg 
 
 #ifdef DEBUG
    cpc = (ea_t)dbg->get_pc();
-   ::qsnprintf(buf, sizeof(buf), "pc leaving is: %p\n", (void*)cpc);
+   _snprintf(buf, sizeof(buf), "pc leaving is: %p\n", (void*)cpc);
    do_safe_msg(buf);
 #endif
 
@@ -2160,7 +2189,7 @@ bool sk3wldbg::read_register(int regidx, regval_t *value) {
 #if IDA_SDK_VERSION >= 700
    op_dtype_t dt = _registers[regidx].dtype;
 #else
-   char dt = _registers[regidx].dtyp;   
+   char dt = _registers[regidx].dtyp;
 #endif
    if (dt == dt_float || dt == dt_double) {
       rtype = RVT_FLOAT;
@@ -2237,7 +2266,7 @@ static ssize_t idaapi idd_hook(void * /* ud */, int notification_code, va_list v
 
    int retcode = DRC_NONE;
    qstring *errbuf;
-   
+
    switch (notification_code) {
       case debugger_t::ev_init_debugger: {
          const char *hostname = va_arg(va, const char *);
@@ -2246,16 +2275,16 @@ static ssize_t idaapi idd_hook(void * /* ud */, int notification_code, va_list v
          errbuf = va_arg(va, qstring *);
          return uni_init_debugger(hostname, portnum, password, errbuf);
       }
-      
+
       case debugger_t::ev_term_debugger:
          return uni_term_debugger();
-      
+
       case debugger_t::ev_get_processes: {
          procinfo_vec_t *procs = va_arg(va, procinfo_vec_t *);
          errbuf = va_arg(va, qstring *);
          return uni_get_processes(procs, errbuf);
       }
-      
+
       case debugger_t::ev_start_process: {
          const char *path = va_arg(va, const char *);
          const char *args = va_arg(va, const char *);
@@ -2267,7 +2296,7 @@ static ssize_t idaapi idd_hook(void * /* ud */, int notification_code, va_list v
          return uni_start_process(path, args, startdir, dbg_proc_flags,
                                 input_path, input_file_crc32, errbuf);
       }
-      
+
       case debugger_t::ev_attach_process: {
          pid_t pid = va_argi(va, pid_t);
          int event_id = va_arg(va, int);
@@ -2275,30 +2304,30 @@ static ssize_t idaapi idd_hook(void * /* ud */, int notification_code, va_list v
          errbuf = va_arg(va, qstring *);
          return uni_attach_process(pid, event_id, dbg_proc_flags, errbuf);
       }
-      
+
       case debugger_t::ev_detach_process:
          return uni_detach_process();
-      
+
       case debugger_t::ev_get_debapp_attrs: {
          debapp_attrs_t *out_pattrs = va_arg(va, debapp_attrs_t *);
          uni_get_debapp_attrs(out_pattrs);
          return DRC_OK;
       }
-      
+
       case debugger_t::ev_rebase_if_required_to: {
          ea_t new_base = va_arg(va, ea_t);
          uni_rebase_if_required_to(new_base);
          return DRC_OK;
       }
-      
+
       case debugger_t::ev_request_pause:
          errbuf = va_arg(va, qstring *);
          return uni_prepare_to_pause_process(errbuf);
-      
+
       case debugger_t::ev_exit_process:
          errbuf = va_arg(va, qstring *);
          return uni_exit_process(errbuf);
-      
+
       case debugger_t::ev_get_debug_event: {
          gdecode_t *code = va_arg(va, gdecode_t *);
          debug_event_t *event = va_arg(va, debug_event_t *);
@@ -2307,42 +2336,42 @@ static ssize_t idaapi idd_hook(void * /* ud */, int notification_code, va_list v
          return DRC_OK;
          break;
       }
-      
+
       case debugger_t::ev_resume: {
          debug_event_t *event = va_arg(va, debug_event_t *);
          return uni_continue_after_event(event);
       }
-      
+
       case debugger_t::ev_set_exception_info: {
          exception_info_t *info = va_arg(va, exception_info_t *);
          int qty = va_arg(va, int);
          uni_set_exception_info(info, qty);
          return DRC_OK;
       }
-      
+
       case debugger_t::ev_suspended: {
          bool dlls_added = va_argi(va, bool);
          thread_name_vec_t *thr_names = va_arg(va, thread_name_vec_t *);
          uni_stopped_at_debug_event(thr_names, dlls_added);
          return DRC_OK;
       }
-      
+
       case debugger_t::ev_thread_suspend: {
          thid_t tid = va_argi(va, thid_t);
          return uni_thread_suspend(tid);
       }
-      
+
       case debugger_t::ev_thread_continue: {
          thid_t tid = va_argi(va, thid_t);
          return uni_thread_continue(tid);
       }
-      
+
       case debugger_t::ev_set_resume_mode: {
          thid_t tid = va_argi(va, thid_t);
          resume_mode_t resmod = va_argi(va, resume_mode_t);
          return uni_set_resume_mode(tid, resmod);
       }
-      
+
       case debugger_t::ev_read_registers: {
          thid_t tid = va_argi(va, thid_t);
          int clsmask = va_arg(va, int);
@@ -2350,7 +2379,7 @@ static ssize_t idaapi idd_hook(void * /* ud */, int notification_code, va_list v
          errbuf = va_arg(va, qstring *);
          return uni_read_registers(tid, clsmask, values, errbuf);
       }
-      
+
       case debugger_t::ev_write_register: {
          thid_t tid = va_argi(va, thid_t);
          int regidx = va_arg(va, int);
@@ -2358,7 +2387,7 @@ static ssize_t idaapi idd_hook(void * /* ud */, int notification_code, va_list v
          errbuf = va_arg(va, qstring *);
          return uni_write_register(tid, regidx, value, errbuf);
       }
-      
+
       case debugger_t::ev_thread_get_sreg_base: {
          ea_t *answer = va_arg(va, ea_t *);
          thid_t tid = va_argi(va, thid_t);
@@ -2366,13 +2395,13 @@ static ssize_t idaapi idd_hook(void * /* ud */, int notification_code, va_list v
          errbuf = va_arg(va, qstring *);
          return uni_thread_get_sreg_base(answer, tid, sreg_value, errbuf);
       }
-      
+
       case debugger_t::ev_get_memory_info: {
          meminfo_vec_t *ranges = va_arg(va, meminfo_vec_t *);
          errbuf = va_arg(va, qstring *);
          return uni_get_memory_info(*ranges, errbuf);
       }
-      
+
       case debugger_t::ev_read_memory: {
          size_t *nbytes = va_arg(va, size_t *);
          ea_t ea = va_arg(va, ea_t);
@@ -2383,7 +2412,7 @@ static ssize_t idaapi idd_hook(void * /* ud */, int notification_code, va_list v
          *nbytes = code >= 0 ? code : 0;
          return code >= 0 ? DRC_OK : DRC_NOPROC;
       }
-      
+
       case debugger_t::ev_write_memory: {
          size_t *nbytes = va_arg(va, size_t *);
          ea_t ea = va_arg(va, ea_t);
@@ -2394,7 +2423,7 @@ static ssize_t idaapi idd_hook(void * /* ud */, int notification_code, va_list v
          *nbytes = code >= 0 ? code : 0;
          return code >= 0 ? DRC_OK : DRC_NOPROC;
       }
-      
+
       case debugger_t::ev_check_bpt: {
          int *bptvc = va_arg(va, int *);
          bpttype_t type = va_argi(va, bpttype_t);
@@ -2403,7 +2432,7 @@ static ssize_t idaapi idd_hook(void * /* ud */, int notification_code, va_list v
          *bptvc = uni_is_ok_bpt(type, ea, len);
          return DRC_OK;
       }
-      
+
       case debugger_t::ev_update_bpts: {
          int *nbpts = va_arg(va, int *);
          update_bpt_info_t *bpts = va_arg(va, update_bpt_info_t *);
@@ -2412,7 +2441,7 @@ static ssize_t idaapi idd_hook(void * /* ud */, int notification_code, va_list v
          errbuf = va_arg(va, qstring *);
          return uni_update_bpts(nbpts, bpts, nadd, ndel, errbuf);
       }
-      
+
       case debugger_t::ev_update_lowcnds: {
          int *nupdated = va_arg(va, int *);
          const lowcnd_t *lowcnds = va_arg(va, const lowcnd_t *);
@@ -2420,20 +2449,20 @@ static ssize_t idaapi idd_hook(void * /* ud */, int notification_code, va_list v
          errbuf = va_arg(va, qstring *);
          return uni_update_lowcnds(nupdated, lowcnds, nlowcnds, errbuf);
       }
-      
+
       case debugger_t::ev_open_file: {
          const char *file = va_arg(va, const char *);
          uint64 *fsize = va_arg(va, uint64 *);
          bool readonly = va_argi(va, bool);
          return uni_open_file(file, fsize, readonly);
       }
-      
+
       case debugger_t::ev_close_file: {
          int fn = va_arg(va, int);
          uni_close_file(fn);
          retcode = DRC_OK;
       }
-      
+
       case debugger_t::ev_read_file: {
          int fn = va_arg(va, int);
          qoff64_t off = va_arg(va, qoff64_t);
@@ -2441,7 +2470,7 @@ static ssize_t idaapi idd_hook(void * /* ud */, int notification_code, va_list v
          size_t size = va_arg(va, size_t);
          return uni_read_file(fn, off, buf, size);
       }
-      
+
       case debugger_t::ev_write_file: {
          int fn = va_arg(va, int);
          qoff64_t off = va_arg(va, qoff64_t);
@@ -2449,7 +2478,7 @@ static ssize_t idaapi idd_hook(void * /* ud */, int notification_code, va_list v
          size_t size = va_arg(va, size_t);
          return uni_write_file(fn, off, buf, size);
       }
-      
+
       case debugger_t::ev_map_address: {
          ea_t *mapped = va_arg(va, ea_t *);
          ea_t ea = va_arg(va, ea_t);
@@ -2458,7 +2487,7 @@ static ssize_t idaapi idd_hook(void * /* ud */, int notification_code, va_list v
          *mapped = uni_map_address(ea, regs, regnum);
          return DRC_OK;
       }
-      
+
 #ifdef GET_DEBMOD_EXTS
       case debugger_t::ev_get_debmod_extensions: {
          const void **ext = va_arg(va, const void **);
@@ -2466,7 +2495,7 @@ static ssize_t idaapi idd_hook(void * /* ud */, int notification_code, va_list v
          return DRC_OK;
       }
 #endif
-      
+
 #ifdef HAVE_UPDATE_CALL_STACK
       case debugger_t::ev_update_call_stack: {
          thid_t tid = va_argi(va, thid_t);
@@ -2474,7 +2503,7 @@ static ssize_t idaapi idd_hook(void * /* ud */, int notification_code, va_list v
          return uni_update_call_stack(tid, trace);
       }
 #endif
-      
+
 #ifdef HAVE_APPCALL
       case debugger_t::ev_appcall: {
          ea_t *blob_ea = va_arg(va, ea_t *);
@@ -2491,20 +2520,20 @@ static ssize_t idaapi idd_hook(void * /* ud */, int notification_code, va_list v
          *blob_ea = uni_appcall(func_ea, tid, fti, nargs, regargs, stkargs, retregs, errbuf, event, opts);
          return DRC_OK;
       }
-      
+
       case debugger_t::ev_cleanup_appcall: {
          thid_t tid = va_argi(va, thid_t);
          return uni_cleanup_appcall(tid);
       }
 #endif
-      
+
       case debugger_t::ev_eval_lowcnd: {
          thid_t tid = va_argi(va, thid_t);
          ea_t ea = va_arg(va, ea_t);
          errbuf = va_arg(va, qstring *);
          return uni_eval_lowcnd(tid, ea, errbuf);
       }
-      
+
       case debugger_t::ev_send_ioctl: {
          int fn = va_arg(va, int);
          const void *buf = va_arg(va, const void *);
@@ -2513,33 +2542,33 @@ static ssize_t idaapi idd_hook(void * /* ud */, int notification_code, va_list v
          ssize_t *poutsize = va_arg(va, ssize_t *);
          return uni_send_ioctl(fn, buf, size, poutbuf, poutsize);
       }
-      
+
       case debugger_t::ev_dbg_enable_trace: {
          thid_t tid = va_arg(va, thid_t);
          bool enable = va_argi(va, bool);
          int trace_flags = va_arg(va, int);
          return uni_dbg_enable_trace(tid, enable, trace_flags) ? DRC_OK : DRC_NONE;
       }
-      
+
       case debugger_t::ev_is_tracing_enabled: {
          thid_t tid = va_arg(va, thid_t);
          int tracebit = va_arg(va, int);
          return uni_is_tracing_enabled(tid, tracebit) ? DRC_OK : DRC_NONE;
          break;
       }
-      
+
       case debugger_t::ev_rexec: {
          const char *cmdline = va_arg(va, const char *);
          return uni_rexec(cmdline);
       }
-      
+
       case debugger_t::ev_get_srcinfo_path: {
          qstring *path = va_arg(va, qstring *);
          ea_t base = va_arg(va, ea_t);
          bool ok = uni_get_srcinfo_path(path, base);
          return ok ? DRC_OK : DRC_NONE;
       }
-      
+
       case debugger_t::ev_bin_search: {
          ea_t *ea = va_arg(va, ea_t *);
          ea_t start_ea = va_arg(va, ea_t);
@@ -2552,9 +2581,9 @@ static ssize_t idaapi idd_hook(void * /* ud */, int notification_code, va_list v
          }
       }
    }
-   
+
    return retcode;
-   
+
 }
 
 #endif

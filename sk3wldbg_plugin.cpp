@@ -65,17 +65,35 @@
 
 static bool hooked = false;
 
+#if IDA_SDK_VERSION < 750
+
+//make life easier in a post 7.5 world
+#define PLUGIN_MULTI 0
+
 int idaapi plugin_init(void);
 void idaapi plugin_term(void);
 
-#if IDA_SDK_VERSION >= 700
-bool idaapi plugin_run(size_t /*arg*/) {
-   return true;
-}
 #else
+
+plugmod_t *idaapi plugin_init(void);
+
+#define plugin_run NULL
+#define plugin_term NULL
+
+#endif
+
+#if IDA_SDK_VERSION < 700
+
 void idaapi plugin_run(int /*arg*/) {
    return;
 }
+
+#elif IDA_SDK_VERSION < 750
+
+bool idaapi plugin_run(size_t /*arg*/) {
+   return true;
+}
+
 #endif
 
 //--------------------------------------------------------------------------
@@ -86,7 +104,7 @@ void idaapi plugin_run(int /*arg*/) {
 
 plugin_t PLUGIN = {
   IDP_INTERFACE_VERSION,
-  PLUGIN_DBG | PLUGIN_HIDE,   // plugin flags
+  PLUGIN_DBG | PLUGIN_HIDE | PLUGIN_MULTI,   // plugin flags
 
   plugin_init,                 // initialize
 
@@ -136,7 +154,7 @@ static int idaapi ui_hook(void *user_data, int notification_code, va_list va) {
          }
          else if (registered) {
             detach_action_from_menu("Debugger/Take memory snapshot", "sk3wldbg:mem_map");
-            unregister_action("sk3wldbg:mem_map");            
+            unregister_action("sk3wldbg:mem_map");
             registered = false;
          }
 */
@@ -146,23 +164,28 @@ static int idaapi ui_hook(void *user_data, int notification_code, va_list va) {
    return 0;
 }
 
-//--------------------------------------------------------------------------
-//
-//      Initialize.
-//
-//      IDA will call this function only once.
-//      If this function returns PLGUIN_SKIP, IDA will never load it again.
-//      If this function returns PLUGIN_OK, IDA will unload the plugin but
-//      remember that the plugin agreed to work with the database.
-//      The plugin will be loaded again if the user invokes it by
-//      pressing the hotkey or selecting it from the menu.
-//      After the second load the plugin will stay on memory.
-//      If this function returns PLUGIN_KEEP, IDA will keep the plugin
-//      in the memory. In this case the initialization function can hook
-//      into the processor module and user interface notification points.
-//      See the hook_to_notification_point() function.
-//
-int idaapi plugin_init(void) {
+void idaapi term_common(void) {
+#ifdef DEBUG
+   msg(PLUGIN_NAME": term entered\n");
+#endif
+
+   if (hooked) {
+      unhook_from_notification_point(::HT_UI, ui_hook);
+      hooked = false;
+   }
+   if (registered) {
+      //This call is currently causing IDA to crash so something is
+      //not being done correctly.
+      //Wrong place to unregister? Wrong thread to unregister from?
+//      unregister_action("sk3wldbg:mem_map");
+   }
+
+#ifdef DEBUG
+   msg(PLUGIN_NAME": term exiting\n");
+#endif
+}
+
+bool init_common(void) {
    sk3wldbg *sdbg = NULL;
    msg("sk3wldbg trying to init\n");
    int debug_mode = UC_MODE_32;
@@ -225,7 +248,7 @@ int idaapi plugin_init(void) {
          break;
       default:
          msg("sk3wldbg: unsupported processor\n");
-         return PLUGIN_SKIP;
+         return false;
    }
 //   hook_to_notification_point(::HT_UI, ui_hook, dbg);
 //   hooked = true;
@@ -234,7 +257,33 @@ int idaapi plugin_init(void) {
    register_action(mem_map_action);
    registered = true;
    msg(PLUGIN_NAME" keeping sk3wldbg\n");
-   return PLUGIN_KEEP;
+   return true;
+}
+
+//--------------------------------------------------------------------------
+//
+//      Initialize.
+//
+//      IDA will call this function only once.
+//      If this function returns PLGUIN_SKIP, IDA will never load it again.
+//      If this function returns PLUGIN_OK, IDA will unload the plugin but
+//      remember that the plugin agreed to work with the database.
+//      The plugin will be loaded again if the user invokes it by
+//      pressing the hotkey or selecting it from the menu.
+//      After the second load the plugin will stay on memory.
+//      If this function returns PLUGIN_KEEP, IDA will keep the plugin
+//      in the memory. In this case the initialization function can hook
+//      into the processor module and user interface notification points.
+//      See the hook_to_notification_point() function.
+//
+#if IDA_SDK_VERSION < 750
+int idaapi plugin_init(void) {
+   if (init_common()) {
+      return PLUGIN_KEEP;
+   }
+   else {
+      return PLUGIN_SKIP;
+   }
 }
 
 //--------------------------------------------------------------------------
@@ -248,23 +297,37 @@ int idaapi plugin_init(void) {
 #endif
 
 void idaapi plugin_term(void) {
-#ifdef DEBUG
-   msg(PLUGIN_NAME": term entered\n");
-#endif
-
-   if (hooked) {
-      unhook_from_notification_point(::HT_UI, ui_hook);
-      hooked = false;
-   }
-   if (registered) {
-      //This call is currently causing IDA to crash so something is 
-      //not being done correctly.
-      //Wrong place to unregister? Wrong thread to unregister from?
-//      unregister_action("sk3wldbg:mem_map");            
-   }
-
-#ifdef DEBUG
-   msg(PLUGIN_NAME": term exiting\n");
-#endif
+   term_common();
 }
 
+#else  //IDA_SDK_VERSION >= 750
+
+// things are done differently beginning in 7.5
+
+struct sk3wl_plugmod_t : public plugmod_t {
+  /// Invoke the plugin.
+  virtual bool idaapi run(size_t arg);
+
+  /// Virtual destructor.
+  virtual ~sk3wl_plugmod_t();
+};
+
+plugmod_t *idaapi plugin_init(void) {
+   if (init_common()) {
+      return new sk3wl_plugmod_t();
+   }
+   else {
+      return NULL;
+   }
+}
+
+sk3wl_plugmod_t::~sk3wl_plugmod_t(void) {
+   term_common();
+}
+
+bool idaapi sk3wl_plugmod_t::run(size_t /*arg*/) {
+   return true;
+}
+
+
+#endif
