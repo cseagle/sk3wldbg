@@ -78,6 +78,10 @@
 #include "sk3wldbg.h"
 #include "loader.h"
 
+#ifndef _WIN32
+#define _snprintf snprintf
+#endif
+
 #ifdef DEBUG
 #undef DEBUG
 #else
