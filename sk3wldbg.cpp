@@ -78,6 +78,10 @@
 #include "sk3wldbg.h"
 #include "loader.h"
 
+#ifndef _WIN32
+#define _snprintf snprintf
+#endif
+
 #ifdef DEBUG
 #undef DEBUG
 #else
@@ -109,6 +113,35 @@ qstring *get_process_name() {
    char buf[1024];
    ssize_t sz = get_root_filename(buf, sizeof(buf));
    return new qstring(buf);
+}
+
+#if IDA_SDK_VERSION >= 700
+static ssize_t idaapi idb_hook(void *user_data, int notification_code, va_list va) {
+#else
+static int idaapi idb_hook(void *user_data, int notification_code, va_list va) {
+#endif
+   sk3wldbg *uc = (sk3wldbg*)user_data;
+   switch (notification_code) {
+      case idb_event::segm_added: {
+         segment_t *seg = va_arg(va, segment_t *);
+         uintptr_t start = seg->start_ea;
+         uintptr_t end = seg->end_ea;
+         msg("idb_hook uc == %p\n", uc);
+         msg("offset to uc->memmgr == 0x%x\n", ((char*)&uc->memmgr) - (char*)uc);
+         msg("uc->memmgr == %p\n", uc->memmgr);
+         msg("segm_added mapping, %p:%p\n", (void*)start, (void*)end);
+         if (uc->memmgr->find_block(start) == NULL) {
+            msg("segm_added mapping, %p:%p\n", (void*)start, (void*)end);
+            uc->map_mem_zero(start, end, UC_PROT_READ | UC_PROT_WRITE | UC_PROT_EXEC, SDB_MAP_FIXED);
+            msg("segm_added mapped, %p:%p\n", (void*)start, (void*)end);
+         }
+         else {
+            msg("segm_added already mapped\n");
+         }
+         return 1;
+      }
+   }
+   return 0;
 }
 
 /// Initialize debugger.
@@ -151,6 +184,9 @@ bool idaapi uni_term_debugger(void) {
       }
 //      uc->uc = NULL;
    }
+
+   unhook_from_notification_point(::HT_IDB, idb_hook);
+
 //   safe_msg req2("uni_term_debugger complete\n");
 //   execute_sync(req2, MFF_FAST);
    return true;
@@ -469,8 +505,25 @@ int idaapi uni_start_process(const char * /*path*/,
 
       //need other ways to set PC, from start, user specified
       uc->set_pc(init_pc);
-
    }
+   else { // we loaded it, but may need to load any additional segments that exist in IDA
+      segment_t *seg;
+      void *buf;
+      for (seg = get_first_seg(); seg != NULL; seg = get_next_seg(seg->startEA)) {
+         if (seg->is_loader_segm()) {
+            //should have been handled by our loader
+            continue;
+         }
+         ssize_t exact = (ssize_t)(seg->endEA - seg->startEA);
+         buf = uc->map_mem_zero(seg->startEA, seg->endEA, ida_to_uc_perms_map[SEGPERM_EXEC | SEGPERM_WRITE | SEGPERM_READ], SDB_MAP_FIXED);
+         msg("trying to populate new segment\n");
+         get_many_bytes(seg->startEA, buf, exact);
+         msg("populated new segment\n");
+      }
+   }
+
+   // need to respond to some idb events
+   hook_to_notification_point(::HT_IDB, idb_hook, uc);
 
    //init registers
    //TODO: each architecture subclass should have its own register state initialization
@@ -1839,6 +1892,7 @@ bool sk3wldbg::open() {
       return false;
    }
    memmgr = new mem_mgr(uc);
+   msg("sk3wldbg::open uc == %p, memmgr = %p\n", this, memmgr);
    install_initial_hooks();
    return true;
 }
@@ -1898,6 +1952,9 @@ void *sk3wldbg::map_mem_zero(uint64_t startAddr, uint64_t endAddr, unsigned int 
       msg("Size too large in map_mem_zero\n");
       return NULL;
    }
+   // for now we cheat and make all sections rwx in unicorn to easily handle self modifying code
+   // we would need to handle mprotect and VirtualProtect-like functions to catch permission changes
+   perms = UC_PROT_READ | UC_PROT_WRITE | UC_PROT_EXEC;
    map_block *b = memmgr->mmap(pageAddr, (uint32_t)blockSize, perms, flags);
    if (b) {
       //return a pointer to the byte corresponding to startAddr
