@@ -183,8 +183,8 @@ PE32+/x86_64/Windows.
      void sk3wl_munmap(int64 base, long size)
 ```
 
-     `sk3wl_mmap` may be used to map new regions of memory into an emulated unicorn process.
-     These may be invoked from python via the `eval_idc_expr` function:
+`sk3wl_mmap` may be used to map new regions of memory into an emulated unicorn process.
+These may be invoked from python via the `eval_idc_expr` function:
 
 ```
          idaapi.eval_idc_expr(idaapi.idc_value_t(), BADADDR, "sk3wl_mmap(0x41414000, 0x1000, 7)")
