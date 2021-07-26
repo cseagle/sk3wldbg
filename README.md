@@ -174,14 +174,18 @@ PE32+/x86_64/Windows.
 * IDA's "Take memory snapshot" feature works.
 * Conditional breakpoints handled by IDA
 * Installed IDC functions allow for mapping additional memory into a Unicorn process
+```
      int64 sk3wl_mmap(int64 base, long size, int perms) where perms are a combination of:
          #define SEGPERM_EXEC  1         ///< Execute
          #define SEGPERM_WRITE 2         ///< Write
          #define SEGPERM_READ  4         ///< Read
      void sk3wl_munmap(int64 base, long size)
-     sk3wl_mmap may be used to map new regions of memory into an emulated unicorn process.
-     These may be invoked from python via the eval_idc_expr function:
+```
+     `sk3wl_mmap` may be used to map new regions of memory into an emulated unicorn process.
+     These may be invoked from python via the `eval_idc_expr` function:
+```
          idaapi.eval_idc_expr(idaapi.idc_value_t(), BADADDR, "sk3wl_mmap(0x41414000, 0x1000, 7)")
+```
 
 ## THINGS THAT DON'T WORK (because they are not yet implemented)
 
