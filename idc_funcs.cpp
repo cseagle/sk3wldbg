@@ -94,8 +94,8 @@ void zero_fill(ea_t base, size_t size) {
 void createNewSegment(const char *name, ea_t base, uint32_t size, uint32_t perms, uint32_t bitness) {
    //create the new segment
    segment_t s;
-   s.startEA = base;
-   s.endEA = base + size;
+   s.start_ea = base;
+   s.end_ea = base + size;
    s.align = saRelPara;
    s.comb = scPub;
    s.perm = (uint8_t)perms;

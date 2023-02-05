@@ -43,11 +43,7 @@
 #include <typeinf.hpp>
 #include <nalt.hpp>
 #include <segment.hpp>
-#if IDA_SDK_VERSION >= 700
 #include <segregs.hpp>
-#else
-#include <srarea.hpp>
-#endif
 #include <typeinf.hpp>
 #include <struct.hpp>
 #include <entry.hpp>
@@ -82,13 +78,7 @@ plugmod_t *idaapi plugin_init(void);
 
 #endif
 
-#if IDA_SDK_VERSION < 700
-
-void idaapi plugin_run(int /*arg*/) {
-   return;
-}
-
-#elif IDA_SDK_VERSION < 750
+#if IDA_SDK_VERSION < 750
 
 bool idaapi plugin_run(size_t /*arg*/) {
    return true;
@@ -137,11 +127,7 @@ static action_desc_t mem_map_action = {
 
 static bool registered = false;
 
-#if IDA_SDK_VERSION >= 700
 static ssize_t idaapi ui_hook(void *user_data, int notification_code, va_list va) {
-#else
-static int idaapi ui_hook(void *user_data, int notification_code, va_list va) {
-#endif
    switch (notification_code) {
       case ui_debugger_menu_change: {
          bool enable = va_arg(va, int) != 0;
@@ -309,7 +295,7 @@ struct sk3wl_plugmod_t : public plugmod_t {
   virtual bool idaapi run(size_t arg);
 
   /// Virtual destructor.
-  virtual ~sk3wl_plugmod_t();
+  virtual ~sk3wl_plugmod_t(void);
 };
 
 plugmod_t *idaapi plugin_init(void) {

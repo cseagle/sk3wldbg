@@ -19,7 +19,7 @@
 
 #include "sk3wldbg_sparc.h"
 
-static const char *sparc_register_classes[] = {
+static const char *sparc_regclasses[] = {
    "General registers",
    NULL
 };
@@ -94,10 +94,10 @@ sk3wldbg_sparc::sk3wldbg_sparc() : sk3wldbg("sparcl", UC_ARCH_SPARC, UC_MODE_32)
       processor = "sparcb";
    }
 
-   register_classes = sparc_register_classes;
-   register_classes_default = SPARC_GENERAL;    ///< Mask of default printed register classes
-   _registers = sparc_regs;               ///< Array of registers. Use registers() to access it
-   registers_size = qnumber(sparc_regs);  ///< Number of registers
+   regclasses = sparc_regclasses;
+   default_regclasses = SPARC_GENERAL;    ///< Mask of default printed register classes
+   registers = sparc_regs;               ///< Array of registers. Use registers() to access it
+   nregs = qnumber(sparc_regs);  ///< Number of registers
    reg_map = sparc_reg_map;
    bpt_bytes = NULL;                ///< Array of bytes for a breakpoint instruction
    bpt_size = 0;                    ///< Size of this array
@@ -116,10 +116,10 @@ sk3wldbg_sparc64::sk3wldbg_sparc64() : sk3wldbg("sparcl", UC_ARCH_SPARC, UC_MODE
       processor = "sparcb";
    }
 
-   register_classes = sparc_register_classes;
-   register_classes_default = SPARC_GENERAL;    ///< Mask of default printed register classes
-   _registers = sparc_regs;               ///< Array of registers. Use registers() to access it
-   registers_size = qnumber(sparc_regs);  ///< Number of registers
+   regclasses = sparc_regclasses;
+   default_regclasses = SPARC_GENERAL;    ///< Mask of default printed register classes
+   registers = sparc_regs;               ///< Array of registers. Use registers() to access it
+   nregs = qnumber(sparc_regs);  ///< Number of registers
    reg_map = sparc64_reg_map;
    bpt_bytes = NULL;                ///< Array of bytes for a breakpoint instruction
    bpt_size = 0;                    ///< Size of this array

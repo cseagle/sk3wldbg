@@ -19,7 +19,7 @@
 
 #include "sk3wldbg_m68k.h"
 
-static const char *m68k_register_classes[] = {
+static const char *m68k_regclasses[] = {
    "General registers",
    NULL
 };
@@ -65,10 +65,10 @@ static int32_t m68k_reg_map[] = {
 sk3wldbg_m68k::sk3wldbg_m68k() : sk3wldbg("68000", UC_ARCH_M68K, UC_MODE_32) {
    //reset any overridden function pointers and setup register name fields
 
-   register_classes = m68k_register_classes;
-   register_classes_default = 1;    ///< Mask of default printed register classes
-   _registers = m68k_regs;               ///< Array of registers. Use registers() to access it
-   registers_size = qnumber(m68k_regs);  ///< Number of registers
+   regclasses = m68k_regclasses;
+   default_regclasses = 1;    ///< Mask of default printed register classes
+   registers = m68k_regs;               ///< Array of registers. Use registers() to access it
+   nregs = qnumber(m68k_regs);  ///< Number of registers
    reg_map = m68k_reg_map;
    bpt_bytes = NULL;                ///< Array of bytes for a breakpoint instruction
    bpt_size = 0;                    ///< Size of this array

@@ -17,24 +17,35 @@
    Place, Suite 330, Boston, MA 02111-1307 USA
 */
 
+#include <map>
 #include "sk3wldbg.h"
 
+using std::map;
+
 struct sk3wldbg_x86_16 : public sk3wldbg {
-   sk3wldbg_x86_16();
-   bool save_ret_addr(uint64_t retaddr);
-   bool call_changes_sp() {return true;};
+    map<uint8_t,uint32_t> dos_irq_table;
+    
+    sk3wldbg_x86_16(void);
+    virtual void init_session(void);
+    bool save_ret_addr(uint64_t retaddr);
+    bool call_changes_sp(void) {return true;};
+    virtual bool set_pc(uint64_t pc);
+    virtual uint64_t get_pc(void);
+    virtual void intr_hook(uint32_t intno);
+    
+    void handle_dos_int21(void);
 };
 
 struct sk3wldbg_x86_32 : public sk3wldbg {
-   sk3wldbg_x86_32();   
-   bool save_ret_addr(uint64_t retaddr);
-   bool call_changes_sp() {return true;};
-   virtual bool is_system_call(uint8_t *inst, uint32_t size);
-   virtual void handle_system_call(uint8_t *inst, uint32_t size);
+    sk3wldbg_x86_32(void);
+    bool save_ret_addr(uint64_t retaddr);
+    bool call_changes_sp(void) {return true;};
+    virtual bool is_system_call(uint8_t *inst, uint32_t size);
+    virtual void handle_system_call(uint8_t *inst, uint32_t size);
 };
 
 struct sk3wldbg_x86_64 : public sk3wldbg {
-   sk3wldbg_x86_64();
-   bool save_ret_addr(uint64_t retaddr);
-   bool call_changes_sp() {return true;};
+    sk3wldbg_x86_64(void);
+    bool save_ret_addr(uint64_t retaddr);
+    bool call_changes_sp(void) {return true;};
 };

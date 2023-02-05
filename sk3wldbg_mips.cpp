@@ -20,7 +20,7 @@
 #include "sk3wldbg_mips.h"
 #include <idp.hpp>
 
-static const char *mips_register_classes[] = {
+static const char *mips_regclasses[] = {
    "General registers",
    "Floating point registers",
    NULL
@@ -220,10 +220,10 @@ sk3wldbg_mips::sk3wldbg_mips() : sk3wldbg("mipsl", UC_ARCH_MIPS, UC_MODE_MIPS32)
       processor = "mipsb";
    }
 
-   register_classes = mips_register_classes;
-   register_classes_default = MIPS_GENERAL;    ///< Mask of default printed register classes
-   _registers = mips_regs;               ///< Array of registers. Use registers() to access it
-   registers_size = qnumber(mips_regs);              ///< Number of registers
+   regclasses = mips_regclasses;
+   default_regclasses = MIPS_GENERAL;    ///< Mask of default printed register classes
+   registers = mips_regs;               ///< Array of registers. Use registers() to access it
+   nregs = qnumber(mips_regs);              ///< Number of registers
    reg_map = mips_reg_map;
    bpt_bytes = NULL;                ///< Array of bytes for a breakpoint instruction
    bpt_size = 0;                    ///< Size of this array
@@ -242,10 +242,10 @@ sk3wldbg_mips64::sk3wldbg_mips64() : sk3wldbg("mipsl", UC_ARCH_MIPS, UC_MODE_MIP
       processor = "mipsb";
    }
 
-   register_classes = NULL;
-   register_classes_default = 0;    ///< Mask of default printed register classes
-   _registers = NULL;               ///< Array of registers. Use registers() to access it
-   registers_size = 0;              ///< Number of registers
+   regclasses = NULL;
+   default_regclasses = 0;    ///< Mask of default printed register classes
+   registers = NULL;               ///< Array of registers. Use registers() to access it
+   nregs = 0;              ///< Number of registers
    reg_map = mips64_reg_map;
    bpt_bytes = NULL;                ///< Array of bytes for a breakpoint instruction
    bpt_size = 0;                    ///< Size of this array

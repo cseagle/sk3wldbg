@@ -20,13 +20,9 @@
 #include "sk3wldbg_arm.h"
 #include <idp.hpp>
 #include <segment.hpp>
-#if IDA_SDK_VERSION >= 700
 #include <segregs.hpp>
-#else
-#include <srarea.hpp>
-#endif
 
-static const char *arm_register_classes[] = {
+static const char *arm_regclasses[] = {
    "General registers",
    NULL
 };
@@ -130,10 +126,10 @@ sk3wldbg_arm::sk3wldbg_arm() : sk3wldbg("ARM", UC_ARCH_ARM, UC_MODE_ARM) {
 
    //TODO: test the IDA "T" register to see if this is thumb code before creating emulator instance
 
-   register_classes = arm_register_classes;
-   register_classes_default = 1;        ///< Mask of default printed register classes
-   _registers = arm_regs;               ///< Array of registers. Use registers() to access it
-   registers_size = qnumber(arm_regs);  ///< Number of registers
+   regclasses = arm_regclasses;
+   default_regclasses = 1;        ///< Mask of default printed register classes
+   registers = arm_regs;               ///< Array of registers. Use registers() to access it
+   nregs = qnumber(arm_regs);  ///< Number of registers
    reg_map = arm_reg_map;
    bpt_bytes = NULL;                ///< Array of bytes for a breakpoint instruction
    bpt_size = 0;                    ///< Size of this array
@@ -141,7 +137,7 @@ sk3wldbg_arm::sk3wldbg_arm() : sk3wldbg("ARM", UC_ARCH_ARM, UC_MODE_ARM) {
 }
 
 void sk3wldbg_arm::check_mode(ea_t addr) {
-   sel_t treg = get_segreg(addr, 20);   //20 is ARM T reg
+   sel_t treg = get_sreg(addr, 20);   //20 is ARM T reg
    if (treg) {
       debug_mode = (uc_mode)((int)UC_MODE_THUMB | (int)debug_mode);
 //      msg("Enabling thumb mode\n");
@@ -161,10 +157,10 @@ sk3wldbg_aarch64::sk3wldbg_aarch64() : sk3wldbg("ARM", UC_ARCH_ARM64, UC_MODE_AR
       processor = "ARMB";
    }
 
-   register_classes = arm_register_classes;
-   register_classes_default = 1;          ///< Mask of default printed register classes
-   _registers = aarch64_regs;             ///< Array of registers. Use registers() to access it
-   registers_size = qnumber(aarch64_regs); ///< Number of registers
+   regclasses = arm_regclasses;
+   default_regclasses = 1;          ///< Mask of default printed register classes
+   registers = aarch64_regs;             ///< Array of registers. Use registers() to access it
+   nregs = qnumber(aarch64_regs); ///< Number of registers
    reg_map = arm64_reg_map;
    bpt_bytes = NULL;                ///< Array of bytes for a breakpoint instruction
    bpt_size = 0;                    ///< Size of this array
@@ -172,7 +168,7 @@ sk3wldbg_aarch64::sk3wldbg_aarch64() : sk3wldbg("ARM", UC_ARCH_ARM64, UC_MODE_AR
 }
 
 void sk3wldbg_aarch64::check_mode(ea_t addr) {
-   sel_t thumb = get_segreg(addr, 20);   //20 is ARM T reg
+   sel_t thumb = get_sreg(addr, 20);   //20 is ARM T reg
    if (thumb) {
       debug_mode = (uc_mode)((int)UC_MODE_THUMB | (int)debug_mode);
    }

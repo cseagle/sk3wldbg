@@ -19,7 +19,7 @@
 
 #include "sk3wldbg_ppc.h"
 
-static const char *ppc_register_classes[] = {
+static const char *ppc_regclasses[] = {
    "General registers",
    "Floating point registers",
    NULL
@@ -219,10 +219,10 @@ sk3wldbg_ppc::sk3wldbg_ppc() : sk3wldbg("PPCL", UC_ARCH_PPC, UC_MODE_32) {
       processor = "PPC";
    }
 
-   register_classes = ppc_register_classes;
-   register_classes_default = PPC_GENERAL;    ///< Mask of default printed register classes
-   _registers = ppc_regs;               ///< Array of registers. Use registers() to access it
-   registers_size = qnumber(ppc_regs);  ///< Number of registers
+   regclasses = ppc_regclasses;
+   default_regclasses = PPC_GENERAL;    ///< Mask of default printed register classes
+   registers = ppc_regs;               ///< Array of registers. Use registers() to access it
+   nregs = qnumber(ppc_regs);  ///< Number of registers
 //   reg_map = ppc_reg_map;
    bpt_bytes = NULL;                ///< Array of bytes for a breakpoint instruction
    bpt_size = 0;                    ///< Size of this array
@@ -241,10 +241,10 @@ sk3wldbg_ppc64::sk3wldbg_ppc64() : sk3wldbg("PPCL", UC_ARCH_PPC, UC_MODE_64) {
       processor = "PPC";
    }
 
-   register_classes = ppc_register_classes;
-   register_classes_default = PPC_GENERAL;    ///< Mask of default printed register classes
-   _registers = ppc_regs64;               ///< Array of registers. Use registers() to access it
-   registers_size = qnumber(ppc_regs64);  ///< Number of registers
+   regclasses = ppc_regclasses;
+   default_regclasses = PPC_GENERAL;    ///< Mask of default printed register classes
+   registers = ppc_regs64;               ///< Array of registers. Use registers() to access it
+   nregs = qnumber(ppc_regs64);  ///< Number of registers
 //   reg_map = ppc64_reg_map;
    bpt_bytes = NULL;                ///< Array of bytes for a breakpoint instruction
    bpt_size = 0;                    ///< Size of this array
