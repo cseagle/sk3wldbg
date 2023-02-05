@@ -98,5 +98,14 @@
     <ClInclude Include="..\heap.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\sk3wldbg_riscv.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\sk3wldbg_s390x.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\sk3wldbg_tricore.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

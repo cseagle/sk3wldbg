@@ -180,7 +180,10 @@
     <ClInclude Include="..\sk3wldbg_m68k.h" />
     <ClInclude Include="..\sk3wldbg_mips.h" />
     <ClInclude Include="..\sk3wldbg_ppc.h" />
+    <ClInclude Include="..\sk3wldbg_riscv.h" />
+    <ClInclude Include="..\sk3wldbg_s390x.h" />
     <ClInclude Include="..\sk3wldbg_sparc.h" />
+    <ClInclude Include="..\sk3wldbg_tricore.h" />
     <ClInclude Include="..\sk3wldbg_x86.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
