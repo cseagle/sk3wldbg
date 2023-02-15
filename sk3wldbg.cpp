@@ -1473,6 +1473,10 @@ sk3wldbg::sk3wldbg(const char *procname, uc_arch arch, uc_mode mode, const char 
             DBG_HAS_SET_EXCEPTION_INFO | DBG_HAS_THREAD_SUSPEND | DBG_HAS_THREAD_CONTINUE |
             DBG_HAS_SET_RESUME_MODE | DBG_HAS_CHECK_BPT;
 
+#ifdef HAVE_APPCALL
+   flags2 |= DBG_HAS_APPCALL;
+#endif
+
    filetype = inf_get_filetype();
 
    memory_page_size = 0x1000;
