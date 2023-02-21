@@ -72,9 +72,9 @@ typedef size_t uc_hook;
 // Unicorn API version
 #define UC_API_MAJOR 2
 #define UC_API_MINOR 0
-#define UC_API_PATCH 0
+#define UC_API_PATCH 2
 // Release candidate version, 255 means the official release.
-#define UC_API_EXTRA 255
+#define UC_API_EXTRA 1
 
 // Unicorn package version
 #define UC_VERSION_MAJOR UC_API_MAJOR
@@ -118,8 +118,8 @@ typedef enum uc_mode {
     UC_MODE_ARM = 0,        // ARM mode
     UC_MODE_THUMB = 1 << 4, // THUMB mode (including Thumb-2)
     // Depreciated, use UC_ARM_CPU_* with uc_ctl instead.
-    UC_MODE_MCLASS = 1 << 5, // ARM's Cortex-M series.
-    UC_MODE_V8 = 1 << 6,     // ARMv8 A32 encodings for ARM
+    UC_MODE_MCLASS = 1 << 5,  // ARM's Cortex-M series.
+    UC_MODE_V8 = 1 << 6,      // ARMv8 A32 encodings for ARM
     UC_MODE_ARMBE8 = 1 << 10, // Big-endian data and Little-endian code.
                               // Legacy support for UC1 only.
 

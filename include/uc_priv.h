@@ -168,6 +168,16 @@ typedef void (*uc_add_inline_hook_t)(struct uc_struct *uc, struct hook *hk,
 // Delete a hook from helper_table
 typedef void (*uc_del_inline_hook_t)(struct uc_struct *uc, struct hook *hk);
 
+// Return the size of a CPU context
+typedef size_t (*uc_context_size_t)(struct uc_struct *uc);
+
+// Generate a CPU context
+typedef uc_err (*uc_context_save_t)(struct uc_struct *uc, uc_context *context);
+
+// Restore a CPU context
+typedef uc_err (*uc_context_restore_t)(struct uc_struct *uc,
+                                       uc_context *context);
+
 // hook list offsets
 //
 // The lowest 6 bits are used for hook type index while the others
@@ -285,6 +295,10 @@ struct uc_struct {
     uc_add_inline_hook_t add_inline_hook;
     uc_del_inline_hook_t del_inline_hook;
 
+    uc_context_size_t context_size;
+    uc_context_save_t context_save;
+    uc_context_restore_t context_restore;
+
     /*  only 1 cpu in unicorn,
         do not need current_cpu to handle current running cpu. */
     CPUState *cpu;
@@ -395,7 +409,7 @@ struct uc_context {
 };
 
 // check if this address is mapped in (via uc_mem_map())
-MemoryRegion *memory_mapping(struct uc_struct *uc, uint64_t address);
+MemoryRegion *find_memory_region(struct uc_struct *uc, uint64_t address);
 
 // We have to support 32bit system so we can't hold uint64_t on void*
 static inline void uc_add_exit(uc_engine *uc, uint64_t addr)
