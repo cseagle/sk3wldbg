@@ -412,7 +412,7 @@ int idaapi uni_start_process(const char * /*path*/,
         //need a stack too, just sling it somewhere
         //add it to uc->memory
         unsigned int stack_top = 0xffffe000;
-        uc->init_memmgr(0x100000, stack_top);
+        uc->init_memmgr(0, stack_top);
         uc->map_mem_zero(stack_top - 0x100000, stack_top, UC_PROT_READ | UC_PROT_WRITE | UC_PROT_EXEC, SDB_MAP_FIXED);
         stack_top -= 16;
         uc->set_sp(stack_top);
