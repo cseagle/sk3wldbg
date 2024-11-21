@@ -1154,23 +1154,25 @@ struct TEB_
     DWORD                       LockCount;                                  //0x0FD8
     union
     {
+        DWORD           ProcessRundown;                             //0x0FDC (Vista)
+        DWORD           SpareUlong0;                                //0x0FDC (Win7-Win8)
+        INT32           WowTebOffset;                               //0x0FDC (Win10+)
+    } dwordFDC;
+
+    union
+    {
         struct
         {
-            DWORD               ProcessRundown;                             //0x0FDC (Vista)
             QWORD               LastSwitchTime;                             //0x0FE0 (Vista)
             QWORD               TotalSwitchOutTime;                         //0x0FE8 (Vista)
             LARGE_INTEGER_       WaitReasonBitMap;                           //0x0FF0 (Vista)
-        } vista;
 
-        //end of Vista members
+            //end of Vista members
+
+        } vista;
 
         struct
         {
-            union
-            {
-                DWORD           SpareUlong0;                                //0x0FDC (Win7-Win8)
-                INT32           WowTebOffset;                               //0x0FDC (Win10+)
-            } dwordFDC;
             voidp               ResourceRetValue;                           //0x0FE0 (Win7+)
 
             //end of Windows 7 members (TEB_ shrunk after Vista)
@@ -1179,11 +1181,12 @@ struct TEB_
 
             //end of Windows 8 members
 
+            //members that follow available on Windows 10 and up
+            QWORD               ReservedForCrt;                             //0x0FE8
+
+            GUID_               EffectiveContainerId;                       //0x0FF0
+
+            //end of Windows 10/11
         } afterVista;
-    } dwordFDC;
-
-    //members that follow available on Windows 10 and up (currently unknown)
-
-    BYTE                        ReservedForWin10[0x18];                     //0x0FE8
-
+    } dwordFE0;
 }; //struct TEB_
